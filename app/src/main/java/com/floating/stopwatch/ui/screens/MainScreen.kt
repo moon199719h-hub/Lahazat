@@ -407,6 +407,7 @@ fun MainScreen(
                 if (isSettingsMenuOpen && activeCategory == null) {
                     Spacer(modifier = Modifier.height(2.dp))
                     settingsCategoryList.forEach { cat ->
+                        val isSelected = activeCategory == cat
                         Text(
                             text = cat,
                             style = TextStyle(
@@ -416,6 +417,13 @@ fun MainScreen(
                                 letterSpacing = 2.sp
                             ),
                             modifier = Modifier
+                                .then(
+                                    if (isSelected) {
+                                        Modifier
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(accentColor.copy(alpha = 0.1f))
+                                    } else Modifier
+                                )
                                 .clickable {
                                     resetAutoHideTimer()
                                     isSettingsMenuOpen = false
@@ -1497,14 +1505,14 @@ fun SettingsCategoryPopup(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.75f * popupAlpha))
-            .clickable { onDismiss() },
-        contentAlignment = Alignment.Center
+            .background(Color.Black.copy(alpha = 0.65f * popupAlpha))
+            .clickable { onDismiss() }
+            .padding(top = 56.dp, end = 16.dp),
+        contentAlignment = Alignment.TopEnd
     ) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth(0.9f)
-                .widthIn(max = 520.dp)
+                .widthIn(min = 280.dp, max = 360.dp)
                 .wrapContentHeight()
                 .graphicsLayer {
                     alpha = popupAlpha
@@ -1512,10 +1520,10 @@ fun SettingsCategoryPopup(
                     scaleY = popupScale
                 }
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(12.dp),
             color = Color(0xFF0D0D0D),
-            border = BorderStroke(1.dp, accentColor.copy(alpha = 0.35f)),
-            shadowElevation = 16.dp
+            border = BorderStroke(1.dp, accentColor.copy(alpha = 0.3f)),
+            shadowElevation = 12.dp
         ) {
             Column(
                 modifier = Modifier

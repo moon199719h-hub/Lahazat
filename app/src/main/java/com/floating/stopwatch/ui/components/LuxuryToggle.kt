@@ -31,14 +31,14 @@ fun LuxuryToggle(
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     accentColor: Color = LuxuryColors.AccentGold,
-    trackWidth: Dp = 38.dp,
-    trackHeight: Dp = 20.dp,
-    thumbSize: Dp = 14.dp
+    trackWidth: Dp = 36.dp,
+    trackHeight: Dp = 18.dp,
+    thumbSize: Dp = 12.dp
 ) {
     val interactionSource = remember { MutableInteractionSource() }
 
     val trackColor by animateColorAsState(
-        targetValue = if (checked) accentColor.copy(alpha = 0.85f) else Color(0xFF242426),
+        targetValue = if (checked) accentColor.copy(alpha = 0.85f) else Color(0xFF202022),
         animationSpec = tween(durationMillis = 150),
         label = "TrackColor"
     )
