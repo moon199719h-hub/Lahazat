@@ -228,14 +228,12 @@ fun MainScreen(
     }
 
     val backgroundPreset by settingsRepository.backgroundPreset.collectAsState(initial = "OFF")
-    val artMode by settingsRepository.artMode.collectAsState(initial = "VOID")
 
     // Layout configuration based on the illumination Mode
-    val currentBgColor = when {
-        artMode == "PAPER" -> Color(0xFFF7F5F0)
-        themeMode in listOf("Midnight", "Midnight Dark", "Obsidian Dark") -> Color(0xFF000000)
-        themeMode in listOf("Warm Paper", "Warm Paper Light") -> Color(0xFFF7F5F0)
-        themeMode == "Pure White Light" -> Color(0xFFFFFFFF)
+    val currentBgColor = when (themeMode) {
+        "Midnight", "Midnight Dark", "Obsidian Dark" -> Color(0xFF000000)
+        "Warm Paper", "Warm Paper Light" -> Color(0xFFF7F5F0)
+        "Pure White Light" -> Color(0xFFFFFFFF)
         else -> LuxuryColors.WarmBlack
     }
 
@@ -257,55 +255,8 @@ fun MainScreen(
             .fillMaxSize()
             .background(currentBgColor)
     ) {
-        if (artMode == "STELLAR" || backgroundPreset == "STELLAR") {
+        if (backgroundPreset == "STELLAR") {
             com.floating.stopwatch.ui.components.StellarBackground()
-        } else if (artMode != "VOID") {
-            com.floating.stopwatch.ui.components.AtmosphereArtwork(artMode = artMode)
-        }
-
-        // Mode-Specific Artwork Layer
-        when (currentMode) {
-            AppMode.Stopwatch -> {
-                com.floating.stopwatch.ui.components.ChronoNoirArtwork(
-                    elapsedTimeMs = elapsedTimeMs,
-                    accentColor = accentColor
-                )
-            }
-            AppMode.Countdown -> {
-                com.floating.stopwatch.ui.components.HorizonCountdownArtwork(
-                    remainingMs = countdownRemainingMs,
-                    initialMs = viewModel.countdownInitialMs.value,
-                    accentColor = accentColor
-                )
-            }
-            AppMode.Counter -> {
-                com.floating.stopwatch.ui.components.MonolithCounterArtwork(
-                    counterValue = counterValue,
-                    accentColor = accentColor
-                )
-            }
-            AppMode.Intervals -> {
-                val activeTemplateState by viewModel.intervalActiveTemplate.collectAsState()
-                val currentRound by viewModel.intervalCurrentRound.collectAsState()
-                val stageRemainingMs by viewModel.intervalStageRemainingMs.collectAsState()
-                val currentStage = viewModel.intervalEngine.getCurrentStage()
-                val totalMs = currentStage?.durationMs ?: 1L
-                val stageProgress = 1f - (stageRemainingMs.toFloat() / totalMs.toFloat()).coerceIn(0f, 1f)
-
-                com.floating.stopwatch.ui.components.RhythmIntervalArtwork(
-                    currentRound = currentRound,
-                    totalRounds = activeTemplateState?.repetitions ?: 8,
-                    isWorkPhase = currentStage?.type == IntervalStageType.WORK,
-                    stageProgressFraction = stageProgress,
-                    accentColor = accentColor
-                )
-            }
-            AppMode.TimeLegacy -> {
-                com.floating.stopwatch.ui.components.JourneyLegacyArtwork(
-                    progressFraction = 0.5f,
-                    accentColor = accentColor
-                )
-            }
         }
 
         Box(
@@ -1646,7 +1597,6 @@ fun CategoryContent(
     val themeMode by settingsRepository.themeMode.collectAsState(initial = "Midnight")
     val mainDisplayScale by settingsRepository.mainDisplayScale.collectAsState(initial = 1.0f)
     val backgroundPreset by settingsRepository.backgroundPreset.collectAsState(initial = "OFF")
-    val artMode by settingsRepository.artMode.collectAsState(initial = "VOID")
 
     val shapes = listOf("rounded", "capsule", "circle", "sharp", "glass")
     val themeModes = listOf("Midnight Dark", "Warm Paper Light", "Obsidian Dark", "Pure White Light")
@@ -1654,34 +1604,9 @@ fun CategoryContent(
     val intensities = listOf("Off", "Light", "Medium", "Strong")
     val colorPresets = listOf("Gold", "Galaxy Blue", "Titanium", "Emerald", "Sapphire", "Violet", "Rose", "Ice", "Amber", "Pure White")
     val bgPresets = listOf("OFF", "MIDNIGHT", "STELLAR")
-    val artModes = listOf("VOID", "STELLAR", "HERITAGE", "INK", "SILK", "PAPER", "OBSIDIAN")
 
     when (categoryName.uppercase()) {
         "APPEARANCE" -> {
-            Text("ART MODE SELECTION", color = LuxuryColors.WarmGray, fontSize = 10.sp, letterSpacing = 1.8.sp)
-            LazyColumn(modifier = Modifier.height(80.dp)) {
-                items(artModes.chunked(4)) { rowModes ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
-                        rowModes.forEach { mode ->
-                            val isSel = artMode == mode
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(if (isSel) accentColor.copy(alpha = 0.25f) else Color(0xFF161616))
-                                    .clickable { scope.launch { settingsRepository.setArtMode(mode) } }
-                                    .padding(6.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(mode, color = if (isSel) LuxuryColors.CreamyWhite else LuxuryColors.WarmGray, fontSize = 9.sp)
-                            }
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
             Text("BACKGROUND ATMOSPHERE", color = LuxuryColors.WarmGray, fontSize = 10.sp, letterSpacing = 1.8.sp)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
                 bgPresets.forEach { bg ->
