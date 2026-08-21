@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -102,6 +103,7 @@ fun SettingsScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.62f))
+            .clickable { dismissSettings() }
     ) {
         val panelMaxHeight = (maxHeight - 32.dp).coerceAtMost(680.dp)
         AnimatedVisibility(
@@ -124,7 +126,11 @@ fun SettingsScreen(
                     .heightIn(max = panelMaxHeight)
                     .wrapContentHeight()
                     .statusBarsPadding()
-                    .imePadding(),
+                    .imePadding()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {},
                 shape = RoundedCornerShape(bottomStart = 22.dp, bottomEnd = 22.dp),
                 color = LuxuryColors.WarmBlack,
                 tonalElevation = 0.dp,
