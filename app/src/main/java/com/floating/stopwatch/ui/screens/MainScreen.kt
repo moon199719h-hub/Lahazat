@@ -194,29 +194,32 @@ fun MainScreen(
     var isCounterAmbientDim by remember { mutableStateOf(false) }
 
     if (currentMode == AppMode.Counter && isCounterAmbientDim) {
+        val activity = androidx.compose.ui.platform.LocalContext.current as? android.app.Activity
+        DisposableEffect(isCounterAmbientDim) {
+            val window = activity?.window
+            val prevBrightness = window?.attributes?.screenBrightness ?: android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+            window?.attributes = window?.attributes?.apply {
+                screenBrightness = 0.01f
+            }
+            onDispose {
+                window?.attributes = window?.attributes?.apply {
+                    screenBrightness = prevBrightness
+                }
+            }
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFF000000))
+                .background(Color.Black)
                 .pointerInput(Unit) {
                     detectTapGestures(
-                        onTap = {
+                        onDoubleTap = {
                             isCounterAmbientDim = false
                         }
                     )
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "$counterValue",
-                style = TextStyle(
-                    color = Color(0xFF3A3A3C),
-                    fontSize = counterDigitSize,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                )
-            )
-        }
+                }
+        )
         return
     }
 
