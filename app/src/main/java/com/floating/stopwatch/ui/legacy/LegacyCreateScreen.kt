@@ -28,8 +28,20 @@ fun LegacyCreateScreen(
 ) {
     var title by remember { mutableStateOf(initialLegacy?.title ?: "") }
     var description by remember { mutableStateOf(initialLegacy?.description ?: "") }
-    var targetHoursText by remember { mutableStateOf((initialLegacy?.targetDurationMillis?.div(3600000L) ?: 30L).toString()) }
+    var daysText by remember { mutableStateOf((initialLegacy?.daysCount ?: 30).toString()) }
+    var dailyHoursText by remember { mutableStateOf((initialLegacy?.dailyTargetMinutes?.div(60) ?: 2).toString()) }
+    var dailyMinsText by remember { mutableStateOf((initialLegacy?.dailyTargetMinutes?.rem(60) ?: 30).toString()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    val days = daysText.toIntOrNull() ?: 0
+    val dHours = dailyHoursText.toIntOrNull() ?: 0
+    val dMins = dailyMinsText.toIntOrNull() ?: 0
+
+    val dailyTargetMinutes = (dHours * 60 + dMins).coerceAtLeast(0)
+    val totalMinutes = days * dailyTargetMinutes
+    val totalHoursCalculated = totalMinutes / 60
+    val remainingMinsCalculated = totalMinutes % 60
+    val calculatedTargetMs = totalMinutes * 60000L
 
     Box(
         modifier = Modifier
@@ -55,7 +67,7 @@ fun LegacyCreateScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             if (errorMessage != null) {
                 Text(
@@ -68,12 +80,12 @@ fun LegacyCreateScreen(
             OutlinedTextField(
                 value = title,
                 onValueChange = { title = it; errorMessage = null },
-                label = { Text("Legacy Title *", color = LuxuryColors.WarmGray, fontSize = 11.sp) },
+                label = { Text("Legacy Name / Title *", color = LuxuryColors.WarmGray, fontSize = 11.sp) },
                 textStyle = TextStyle(color = LuxuryColors.CreamyWhite, fontSize = 13.sp),
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             OutlinedTextField(
                 value = description,
@@ -85,33 +97,54 @@ fun LegacyCreateScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            OutlinedTextField(
-                value = targetHoursText,
-                onValueChange = { targetHoursText = it; errorMessage = null },
-                label = { Text("Target Hours *", color = LuxuryColors.WarmGray, fontSize = 11.sp) },
-                textStyle = TextStyle(color = LuxuryColors.CreamyWhite, fontSize = 13.sp),
-                modifier = Modifier.fillMaxWidth()
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = daysText,
+                    onValueChange = { daysText = it; errorMessage = null },
+                    label = { Text("Days Count *", color = LuxuryColors.WarmGray, fontSize = 10.sp) },
+                    textStyle = TextStyle(color = LuxuryColors.CreamyWhite, fontSize = 12.sp),
+                    modifier = Modifier.weight(1f)
+                )
+
+                OutlinedTextField(
+                    value = dailyHoursText,
+                    onValueChange = { dailyHoursText = it; errorMessage = null },
+                    label = { Text("Daily Hours *", color = LuxuryColors.WarmGray, fontSize = 10.sp) },
+                    textStyle = TextStyle(color = LuxuryColors.CreamyWhite, fontSize = 12.sp),
+                    modifier = Modifier.weight(1f)
+                )
+
+                OutlinedTextField(
+                    value = dailyMinsText,
+                    onValueChange = { dailyMinsText = it; errorMessage = null },
+                    label = { Text("Daily Mins *", color = LuxuryColors.WarmGray, fontSize = 10.sp) },
+                    textStyle = TextStyle(color = LuxuryColors.CreamyWhite, fontSize = 12.sp),
+                    modifier = Modifier.weight(1f)
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Text(
-                text = "PRESET DURATIONS",
-                style = TextStyle(color = LuxuryColors.WarmGray, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(10L, 30L, 60L, 100L).forEach { hours ->
-                    Button(
-                        onClick = { targetHoursText = hours.toString(); errorMessage = null },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E1E1E)),
-                        shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, Color(0xFF2C2C2E))
-                    ) {
-                        Text("${hours}h", color = LuxuryColors.AccentGold, fontSize = 11.sp)
-                    }
+            // Calculated Target Preview Banner
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF161616)),
+                shape = RoundedCornerShape(10.dp),
+                border = BorderStroke(1.dp, LuxuryColors.AccentGold.copy(alpha = 0.5f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text(
+                        text = "CALCULATED TARGET TIME",
+                        style = TextStyle(color = LuxuryColors.WarmGray, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "$days days × ${dHours}h ${dMins}m/day = ${totalHoursCalculated}h ${remainingMinsCalculated}m total",
+                        style = TextStyle(color = LuxuryColors.AccentGold, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    )
                 }
             }
 
@@ -138,27 +171,35 @@ fun LegacyCreateScreen(
 
                 Button(
                     onClick = {
-                        val hours = targetHoursText.toLongOrNull()
                         if (title.isBlank()) {
                             errorMessage = "Title is required and cannot be empty."
-                        } else if (hours == null || hours <= 0L) {
-                            errorMessage = "Target duration must be a positive number of hours."
+                        } else if (days <= 0) {
+                            errorMessage = "Number of days must be at least 1."
+                        } else if (dailyTargetMinutes <= 0) {
+                            errorMessage = "Daily target must be greater than 0."
                         } else {
-                            val targetMs = hours * 3600000L
                             val defaultGoal = LegacyGoal(
                                 id = UUID.randomUUID().toString(),
                                 title = "Main Target",
-                                targetDurationMillis = targetMs,
+                                targetDurationMillis = calculatedTargetMs,
                                 actualDurationMillis = initialLegacy?.goals?.firstOrNull()?.actualDurationMillis ?: 0L
                             )
+                            val startMs = initialLegacy?.startAt ?: System.currentTimeMillis()
+                            val endMs = startMs + 86400000L * days
                             val legacyToSave = TimeLegacy(
                                 id = initialLegacy?.id ?: UUID.randomUUID().toString(),
                                 title = title.trim(),
                                 description = description.trim(),
-                                targetDurationMillis = targetMs,
+                                daysCount = days,
+                                dailyTargetMinutes = dailyTargetMinutes,
+                                startAt = startMs,
+                                endAt = endMs,
+                                targetDurationMillis = calculatedTargetMs,
                                 goals = listOf(defaultGoal),
                                 moments = initialLegacy?.moments ?: emptyList(),
                                 journalEntries = initialLegacy?.journalEntries ?: emptyList(),
+                                manualEntries = initialLegacy?.manualEntries ?: emptyList(),
+                                postponements = initialLegacy?.postponements ?: emptyList(),
                                 createdAt = initialLegacy?.createdAt ?: System.currentTimeMillis(),
                                 updatedAt = System.currentTimeMillis()
                             )

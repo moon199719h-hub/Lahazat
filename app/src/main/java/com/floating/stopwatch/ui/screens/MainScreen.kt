@@ -89,6 +89,7 @@ fun MainScreen(
         AppMode.Countdown -> isCountdownRunning
         AppMode.Counter -> false
         AppMode.Intervals -> intervalState == IntervalState.RUNNING
+        AppMode.TimeLegacy -> false
     }
 
     // Controls and Secondary Information Auto-Hide State
@@ -335,12 +336,14 @@ fun MainScreen(
                                 AppMode.Countdown -> 1
                                 AppMode.Counter -> 2
                                 AppMode.Intervals -> 3
+                                AppMode.TimeLegacy -> 0
                             }
                             val targetType = when (currentMode) {
                                 AppMode.Stopwatch -> "stopwatch"
                                 AppMode.Countdown -> "countdown"
                                 AppMode.Counter -> "counter"
                                 AppMode.Intervals -> "intervals"
+                                AppMode.TimeLegacy -> "stopwatch"
                             }
                             scope.launch {
                                 settingsRepository.setWidgetType(targetIndex, targetType)
@@ -371,6 +374,7 @@ fun MainScreen(
                     AppMode.Countdown -> "COUNTDOWN ▾"
                     AppMode.Counter -> "COUNTER ▾"
                     AppMode.Intervals -> "INTERVALS ▾"
+                    AppMode.TimeLegacy -> "TIME LEGACY ▾"
                 },
                 style = TextStyle(
                     color = currentTextColor,
@@ -400,7 +404,7 @@ fun MainScreen(
                 modifier = Modifier
                     .clickable {
                         resetAutoHideTimer()
-                        onNavigateToLegacy()
+                        viewModel.currentMode.value = AppMode.TimeLegacy
                     }
                     .padding(2.dp)
             )
@@ -741,6 +745,12 @@ fun MainScreen(
                         )
                     }
                 }
+                AppMode.TimeLegacy -> {
+                    com.floating.stopwatch.ui.legacy.TimeLegacyScreen(
+                        settingsRepository = settingsRepository,
+                        onBack = { viewModel.cycleMode() }
+                    )
+                }
             }
         }
 
@@ -1045,6 +1055,9 @@ fun MainScreen(
                             style = TextStyle(color = LuxuryColors.WarmBlack, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                         )
                     }
+                }
+                AppMode.TimeLegacy -> {
+                    // Handled internally by TimeLegacyScreen
                 }
             }
         }

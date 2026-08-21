@@ -39,46 +39,87 @@ class SettingsRepository(private val context: Context) {
         context.dataStore.edit { it[TIME_LEGACIES_JSON] = json }
     }
 
-    suspend fun recordCompletedSession(title: String, mode: String, durationMs: Long) {
+    suspend fun recordLegacyTimerSession(legacyId: String, durationMs: Long) {
         if (durationMs < 1000L) return
         context.dataStore.edit { prefs ->
             val json = prefs[TIME_LEGACIES_JSON] ?: "[]"
             val legacies = com.floating.stopwatch.domain.TimeLegacy.parseListJson(json)
-            if (legacies.isNotEmpty()) {
-                val updatedLegacies = legacies.map { legacy ->
-                    if (legacy.status == com.floating.stopwatch.domain.LegacyStatus.ACTIVE) {
-                        val updatedGoals = if (legacy.goals.isNotEmpty()) {
-                            val firstGoal = legacy.goals.first()
-                            listOf(firstGoal.copy(actualDurationMillis = firstGoal.actualDurationMillis + durationMs)) + legacy.goals.drop(1)
-                        } else {
-                            listOf(
-                                com.floating.stopwatch.domain.LegacyGoal(
-                                    id = java.util.UUID.randomUUID().toString(),
-                                    title = "Main Target",
-                                    targetDurationMillis = legacy.targetDurationMillis,
-                                    actualDurationMillis = durationMs
-                                )
-                            )
-                        }
-                        val sessionMoment = com.floating.stopwatch.domain.LegacyMoment(
-                            id = java.util.UUID.randomUUID().toString(),
-                            legacyId = legacy.id,
-                            title = "Completed Session ($mode)",
-                            timestamp = System.currentTimeMillis(),
-                            message = "Logged ${durationMs / 1000}s in $title",
-                            durationMillis = durationMs
-                        )
-                        val updatedMoments = legacy.moments + sessionMoment
-                        val tempLegacy = legacy.copy(goals = updatedGoals, moments = updatedMoments)
-                        val newMilestones = com.floating.stopwatch.domain.LegacyMilestoneDetector.detectNewMilestones(tempLegacy)
-                        tempLegacy.copy(moments = updatedMoments + newMilestones, updatedAt = System.currentTimeMillis())
-                    } else {
-                        legacy
-                    }
+            val updated = legacies.map { legacy ->
+                if (legacy.id == legacyId) {
+                    val newMoment = com.floating.stopwatch.domain.LegacyMoment(
+                        id = java.util.UUID.randomUUID().toString(),
+                        legacyId = legacyId,
+                        title = "Legacy Timer Session",
+                        timestamp = System.currentTimeMillis(),
+                        message = "Logged ${durationMs / 1000}s timer session",
+                        durationMillis = durationMs
+                    )
+                    val updatedMoments = legacy.moments + newMoment
+                    val temp = legacy.copy(moments = updatedMoments, updatedAt = System.currentTimeMillis())
+                    val newMilestones = com.floating.stopwatch.domain.LegacyMilestoneDetector.detectNewMilestones(temp)
+                    temp.copy(moments = updatedMoments + newMilestones)
+                } else {
+                    legacy
                 }
-                prefs[TIME_LEGACIES_JSON] = com.floating.stopwatch.domain.TimeLegacy.serializeListJson(updatedLegacies)
             }
+            prefs[TIME_LEGACIES_JSON] = com.floating.stopwatch.domain.TimeLegacy.serializeListJson(updated)
         }
+    }
+
+    suspend fun addLegacyManualTime(legacyId: String, durationMs: Long, note: String) {
+        if (durationMs <= 0L) return
+        context.dataStore.edit { prefs ->
+            val json = prefs[TIME_LEGACIES_JSON] ?: "[]"
+            val legacies = com.floating.stopwatch.domain.TimeLegacy.parseListJson(json)
+            val updated = legacies.map { legacy ->
+                if (legacy.id == legacyId) {
+                    val newManual = com.floating.stopwatch.domain.LegacyManualEntry(
+                        id = java.util.UUID.randomUUID().toString(),
+                        legacyId = legacyId,
+                        timestamp = System.currentTimeMillis(),
+                        durationMillis = durationMs,
+                        note = note
+                    )
+                    val updatedManuals = legacy.manualEntries + newManual
+                    val temp = legacy.copy(manualEntries = updatedManuals, updatedAt = System.currentTimeMillis())
+                    val newMilestones = com.floating.stopwatch.domain.LegacyMilestoneDetector.detectNewMilestones(temp)
+                    temp.copy(moments = legacy.moments + newMilestones)
+                } else {
+                    legacy
+                }
+            }
+            prefs[TIME_LEGACIES_JSON] = com.floating.stopwatch.domain.TimeLegacy.serializeListJson(updated)
+        }
+    }
+
+    suspend fun postponeLegacy(legacyId: String, addedDays: Int, reason: String) {
+        if (addedDays <= 0) return
+        context.dataStore.edit { prefs ->
+            val json = prefs[TIME_LEGACIES_JSON] ?: "[]"
+            val legacies = com.floating.stopwatch.domain.TimeLegacy.parseListJson(json)
+            val updated = legacies.map { legacy ->
+                if (legacy.id == legacyId) {
+                    val newPostpone = com.floating.stopwatch.domain.LegacyPostponement(
+                        id = java.util.UUID.randomUUID().toString(),
+                        legacyId = legacyId,
+                        timestamp = System.currentTimeMillis(),
+                        addedDays = addedDays,
+                        reason = reason
+                    )
+                    val updatedPostpones = legacy.postponements + newPostpone
+                    val updatedEndAt = (legacy.endAt ?: (legacy.createdAt + 86400000L * legacy.daysCount)) + 86400000L * addedDays
+                    legacy.copy(endAt = updatedEndAt, postponements = updatedPostpones, updatedAt = System.currentTimeMillis())
+                } else {
+                    legacy
+                }
+            }
+            prefs[TIME_LEGACIES_JSON] = com.floating.stopwatch.domain.TimeLegacy.serializeListJson(updated)
+        }
+    }
+
+    suspend fun recordCompletedSession(title: String, mode: String, durationMs: Long) {
+        // Standard session persistence logic for non-Legacy modes.
+        // Rule 2: DO NOT automatically count time from Stopwatch, Countdown, Counter, or Interval towards Time Legacy.
     }
 
     val intervalName: Flow<String> = context.dataStore.data.map { it[INTERVAL_NAME] ?: "HIT" }

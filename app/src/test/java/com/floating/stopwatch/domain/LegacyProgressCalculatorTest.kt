@@ -12,6 +12,7 @@ class LegacyProgressCalculatorTest {
         val legacy = TimeLegacy(
             id = "test_1",
             title = "Test Legacy",
+            daysCount = 10,
             startAt = start,
             endAt = end,
             targetDurationMillis = 36000000L, // 10 hours
@@ -68,6 +69,7 @@ class LegacyProgressCalculatorTest {
         val legacy = TimeLegacy(
             id = "test_rec",
             title = "Behind Legacy",
+            daysCount = 10,
             startAt = start,
             endAt = end,
             targetDurationMillis = 36000000L, // 10h target

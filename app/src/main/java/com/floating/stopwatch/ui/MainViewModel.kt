@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 import com.floating.stopwatch.domain.IntervalEngine
 
 enum class AppMode {
-    Stopwatch, Countdown, Counter, Intervals
+    Stopwatch, Countdown, Counter, Intervals, TimeLegacy
 }
 
 class MainViewModel(
@@ -42,17 +42,19 @@ class MainViewModel(
             AppMode.Stopwatch -> AppMode.Countdown
             AppMode.Countdown -> AppMode.Counter
             AppMode.Counter -> AppMode.Intervals
-            AppMode.Intervals -> AppMode.Stopwatch
+            AppMode.Intervals -> AppMode.TimeLegacy
+            AppMode.TimeLegacy -> AppMode.Stopwatch
         }
         currentMode.value = nextMode
     }
 
     fun previousMode() {
         val prevMode = when (currentMode.value) {
-            AppMode.Stopwatch -> AppMode.Intervals
+            AppMode.Stopwatch -> AppMode.TimeLegacy
             AppMode.Countdown -> AppMode.Stopwatch
             AppMode.Counter -> AppMode.Countdown
             AppMode.Intervals -> AppMode.Counter
+            AppMode.TimeLegacy -> AppMode.Intervals
         }
         currentMode.value = prevMode
     }

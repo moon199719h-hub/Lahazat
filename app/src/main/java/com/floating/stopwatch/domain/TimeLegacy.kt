@@ -49,10 +49,28 @@ data class LegacyJournalEntry(
     val text: String
 )
 
+data class LegacyManualEntry(
+    val id: String,
+    val legacyId: String,
+    val timestamp: Long = System.currentTimeMillis(),
+    val durationMillis: Long = 0L,
+    val note: String = ""
+)
+
+data class LegacyPostponement(
+    val id: String,
+    val legacyId: String,
+    val timestamp: Long = System.currentTimeMillis(),
+    val addedDays: Int = 0,
+    val reason: String = ""
+)
+
 data class TimeLegacy(
     val id: String,
     val title: String,
     val description: String = "",
+    val daysCount: Int = 30,
+    val dailyTargetMinutes: Int = 120,
     val startAt: Long? = null,
     val endAt: Long? = null,
     val targetDurationMillis: Long = 0L,
@@ -61,6 +79,8 @@ data class TimeLegacy(
     val goals: List<LegacyGoal> = emptyList(),
     val moments: List<LegacyMoment> = emptyList(),
     val journalEntries: List<LegacyJournalEntry> = emptyList(),
+    val manualEntries: List<LegacyManualEntry> = emptyList(),
+    val postponements: List<LegacyPostponement> = emptyList(),
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 ) {
@@ -69,6 +89,8 @@ data class TimeLegacy(
         obj.put("id", id)
         obj.put("title", title)
         obj.put("description", description)
+        obj.put("daysCount", daysCount)
+        obj.put("dailyTargetMinutes", dailyTargetMinutes)
         if (startAt != null) obj.put("startAt", startAt)
         if (endAt != null) obj.put("endAt", endAt)
         obj.put("targetDurationMillis", targetDurationMillis)
@@ -124,6 +146,30 @@ data class TimeLegacy(
             journalsArray.put(jObj)
         }
         obj.put("journalEntries", journalsArray)
+
+        val manualsArray = org.json.JSONArray()
+        manualEntries.forEach { me ->
+            val mObj = org.json.JSONObject()
+            mObj.put("id", me.id)
+            mObj.put("legacyId", me.legacyId)
+            mObj.put("timestamp", me.timestamp)
+            mObj.put("durationMillis", me.durationMillis)
+            mObj.put("note", me.note)
+            manualsArray.put(mObj)
+        }
+        obj.put("manualEntries", manualsArray)
+
+        val postponesArray = org.json.JSONArray()
+        postponements.forEach { post ->
+            val pObj = org.json.JSONObject()
+            pObj.put("id", post.id)
+            pObj.put("legacyId", post.legacyId)
+            pObj.put("timestamp", post.timestamp)
+            pObj.put("addedDays", post.addedDays)
+            pObj.put("reason", post.reason)
+            postponesArray.put(pObj)
+        }
+        obj.put("postponements", postponesArray)
 
         return obj
     }
@@ -199,10 +245,46 @@ data class TimeLegacy(
                 }
             }
 
+            val manualsList = mutableListOf<LegacyManualEntry>()
+            val manualsArray = obj.optJSONArray("manualEntries")
+            if (manualsArray != null) {
+                for (i in 0 until manualsArray.length()) {
+                    val mObj = manualsArray.getJSONObject(i)
+                    manualsList.add(
+                        LegacyManualEntry(
+                            id = mObj.getString("id"),
+                            legacyId = mObj.optString("legacyId", ""),
+                            timestamp = mObj.optLong("timestamp", System.currentTimeMillis()),
+                            durationMillis = mObj.optLong("durationMillis", 0L),
+                            note = mObj.optString("note", "")
+                        )
+                    )
+                }
+            }
+
+            val postponesList = mutableListOf<LegacyPostponement>()
+            val postponesArray = obj.optJSONArray("postponements")
+            if (postponesArray != null) {
+                for (i in 0 until postponesArray.length()) {
+                    val pObj = postponesArray.getJSONObject(i)
+                    postponesList.add(
+                        LegacyPostponement(
+                            id = pObj.getString("id"),
+                            legacyId = pObj.optString("legacyId", ""),
+                            timestamp = pObj.optLong("timestamp", System.currentTimeMillis()),
+                            addedDays = pObj.optInt("addedDays", 0),
+                            reason = pObj.optString("reason", "")
+                        )
+                    )
+                }
+            }
+
             return TimeLegacy(
                 id = obj.getString("id"),
                 title = obj.getString("title"),
                 description = obj.optString("description", ""),
+                daysCount = obj.optInt("daysCount", 30),
+                dailyTargetMinutes = obj.optInt("dailyTargetMinutes", 120),
                 startAt = if (obj.has("startAt")) obj.getLong("startAt") else null,
                 endAt = if (obj.has("endAt")) obj.getLong("endAt") else null,
                 targetDurationMillis = obj.optLong("targetDurationMillis", 0L),
@@ -211,6 +293,8 @@ data class TimeLegacy(
                 goals = goalsList,
                 moments = momentsList,
                 journalEntries = journalsList,
+                manualEntries = manualsList,
+                postponements = postponesList,
                 createdAt = obj.optLong("createdAt", System.currentTimeMillis()),
                 updatedAt = obj.optLong("updatedAt", System.currentTimeMillis())
             )

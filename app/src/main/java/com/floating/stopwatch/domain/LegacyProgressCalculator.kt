@@ -3,12 +3,16 @@ package com.floating.stopwatch.domain
 data class LegacyProgressResult(
     val plannedTimeMillis: Long,
     val actualTimeMillis: Long,
+    val timerSessionsTimeMillis: Long,
+    val manualEntriesTimeMillis: Long,
     val remainingTimeMillis: Long,
     val progressFraction: Float,
     val expectedProgressFraction: Float,
     val varianceMillis: Long,
+    val totalDays: Int,
     val elapsedDays: Int,
     val remainingDays: Int,
+    val requiredDailyTargetMillis: Long,
     val status: LegacyProgressStatus
 )
 
@@ -24,9 +28,11 @@ object LegacyProgressCalculator {
 
     fun calculateProgress(legacy: TimeLegacy, currentTimeMillis: Long = System.currentTimeMillis()): LegacyProgressResult {
         val planned = legacy.targetDurationMillis.coerceAtLeast(0L)
-        val goalsActual = legacy.goals.sumOf { it.actualDurationMillis }
-        val momentsActual = legacy.moments.sumOf { it.durationMillis }
-        val actual = (if (goalsActual > 0L) goalsActual else momentsActual).coerceAtLeast(0L)
+        val timerSessionTime = legacy.moments.filter { it.durationMillis > 0L }.sumOf { it.durationMillis }
+        val manualTime = legacy.manualEntries.sumOf { it.durationMillis }
+        val goalsTime = legacy.goals.sumOf { it.actualDurationMillis }
+
+        val actual = (timerSessionTime + manualTime + goalsTime).coerceAtLeast(0L)
         val remaining = (planned - actual).coerceAtLeast(0L)
 
         val progressFraction = if (planned > 0L) {
@@ -35,8 +41,11 @@ object LegacyProgressCalculator {
             0f
         }
 
+        val addedPostponeDays = legacy.postponements.sumOf { it.addedDays }
+        val totalDays = (legacy.daysCount + addedPostponeDays).coerceAtLeast(1)
+
         val start = legacy.startAt ?: legacy.createdAt
-        val end = legacy.endAt ?: (start + 86400000L * 30) // default 30 days
+        val end = legacy.endAt ?: (start + 86400000L * totalDays)
         val totalSpan = (end - start).coerceAtLeast(1L)
         val elapsedSpan = (currentTimeMillis - start).coerceIn(0L, totalSpan)
 
@@ -44,8 +53,14 @@ object LegacyProgressCalculator {
         val expectedActual = (planned * expectedProgressFraction).toLong()
         val varianceMillis = actual - expectedActual
 
-        val elapsedDays = (elapsedSpan / 86400000L).toInt()
-        val remainingDays = ((end - currentTimeMillis).coerceAtLeast(0L) / 86400000L).toInt()
+        val elapsedDays = (elapsedSpan / 86400000L).toInt().coerceIn(0, totalDays)
+        val remainingDays = (totalDays - elapsedDays).coerceAtLeast(0)
+
+        val requiredDailyTargetMillis = if (remainingDays > 0) {
+            remaining / remainingDays
+        } else {
+            remaining
+        }
 
         val status = when {
             actual >= planned && planned > 0L -> LegacyProgressStatus.COMPLETED
@@ -58,12 +73,16 @@ object LegacyProgressCalculator {
         return LegacyProgressResult(
             plannedTimeMillis = planned,
             actualTimeMillis = actual,
+            timerSessionsTimeMillis = timerSessionTime,
+            manualEntriesTimeMillis = manualTime,
             remainingTimeMillis = remaining,
             progressFraction = progressFraction,
             expectedProgressFraction = expectedProgressFraction,
             varianceMillis = varianceMillis,
+            totalDays = totalDays,
             elapsedDays = elapsedDays,
             remainingDays = remainingDays,
+            requiredDailyTargetMillis = requiredDailyTargetMillis,
             status = status
         )
     }

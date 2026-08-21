@@ -1,11 +1,13 @@
 package com.floating.stopwatch.ui.legacy
 
+import android.os.SystemClock
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -22,7 +24,9 @@ import com.floating.stopwatch.domain.LegacyMilestoneDetector
 import com.floating.stopwatch.domain.LegacyProgressCalculator
 import com.floating.stopwatch.domain.LegacyProgressStatus
 import com.floating.stopwatch.domain.TimeLegacy
+import com.floating.stopwatch.ui.components.TimeDisplay
 import com.floating.stopwatch.ui.theme.LuxuryColors
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -66,6 +70,19 @@ fun TimeLegacyScreen(
         loadLegacies()
     }
 
+    androidx.activity.compose.BackHandler(enabled = true) {
+        when (currentSubScreen) {
+            is LegacySubScreen.ListDashboard -> onBack()
+            is LegacySubScreen.CreateEdit -> currentSubScreen = LegacySubScreen.ListDashboard
+            is LegacySubScreen.DetailView -> currentSubScreen = LegacySubScreen.ListDashboard
+            is LegacySubScreen.Plan -> currentSubScreen = LegacySubScreen.DetailView((currentSubScreen as LegacySubScreen.Plan).legacy)
+            is LegacySubScreen.Journey -> currentSubScreen = LegacySubScreen.DetailView((currentSubScreen as LegacySubScreen.Journey).legacy)
+            is LegacySubScreen.Moments -> currentSubScreen = LegacySubScreen.DetailView((currentSubScreen as LegacySubScreen.Moments).legacy)
+            is LegacySubScreen.Insights -> currentSubScreen = LegacySubScreen.DetailView((currentSubScreen as LegacySubScreen.Insights).legacy)
+            is LegacySubScreen.Finale -> currentSubScreen = LegacySubScreen.DetailView((currentSubScreen as LegacySubScreen.Finale).legacy)
+        }
+    }
+
     when (val screen = currentSubScreen) {
         is LegacySubScreen.ListDashboard -> {
             TimeLegacyDashboardView(
@@ -100,6 +117,8 @@ fun TimeLegacyScreen(
         is LegacySubScreen.DetailView -> {
             LegacyDetailView(
                 legacy = screen.legacy,
+                settingsRepository = settingsRepository,
+                onReload = { loadLegacies() },
                 onBack = { currentSubScreen = LegacySubScreen.ListDashboard },
                 onEdit = { currentSubScreen = LegacySubScreen.CreateEdit(screen.legacy) },
                 onOpenPlan = { currentSubScreen = LegacySubScreen.Plan(screen.legacy) },
@@ -315,6 +334,8 @@ fun LegacyCardItem(
 @Composable
 fun LegacyDetailView(
     legacy: TimeLegacy,
+    settingsRepository: SettingsRepository,
+    onReload: () -> Unit,
     onBack: () -> Unit,
     onEdit: () -> Unit,
     onOpenPlan: () -> Unit,
@@ -323,14 +344,49 @@ fun LegacyDetailView(
     onOpenInsights: () -> Unit,
     onOpenFinale: () -> Unit
 ) {
+    val scope = rememberCoroutineScope()
     val progress = LegacyProgressCalculator.calculateProgress(legacy)
     val recovery = LegacyProgressCalculator.calculateRecovery(legacy)
+
+    // Dedicated Legacy Session Timer State (Monotonic timing)
+    var isTimerRunning by remember { mutableStateOf(false) }
+    var sessionElapsedMs by remember { mutableLongStateOf(0L) }
+    var startTimeMs by remember { mutableLongStateOf(0L) }
+    var accumulatedTimeMs by remember { mutableLongStateOf(0L) }
+
+    LaunchedEffect(isTimerRunning) {
+        if (isTimerRunning) {
+            startTimeMs = SystemClock.elapsedRealtime()
+            while (isTimerRunning) {
+                sessionElapsedMs = accumulatedTimeMs + (SystemClock.elapsedRealtime() - startTimeMs)
+                delay(50L)
+            }
+        }
+    }
+
+    // Modal dialog states
+    var showManualModal by remember { mutableStateOf(false) }
+    var showPostponeModal by remember { mutableStateOf(false) }
+
+    if (showManualModal || showPostponeModal) {
+        androidx.activity.compose.BackHandler(enabled = true) {
+            showManualModal = false
+            showPostponeModal = false
+        }
+    }
+
+    var customManualHoursText by remember { mutableStateOf("") }
+    var customManualMinsText by remember { mutableStateOf("") }
+    var manualNote by remember { mutableStateOf("") }
+
+    var postponeDaysText by remember { mutableStateOf("7") }
+    var postponeReason by remember { mutableStateOf("") }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(LuxuryColors.WarmBlack)
-            .padding(24.dp)
+            .padding(20.dp)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
@@ -359,62 +415,371 @@ fun LegacyDetailView(
             }
 
             if (legacy.description.isNotBlank()) {
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = legacy.description,
-                    style = TextStyle(color = LuxuryColors.WarmGray, fontSize = 12.sp, fontWeight = FontWeight.Light)
+                    style = TextStyle(color = LuxuryColors.WarmGray, fontSize = 11.sp, fontWeight = FontWeight.Light)
                 )
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            // Navigation Links for Sub-views
+            // Navigation bar for Legacy Sub-views
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                Text("PLAN", color = LuxuryColors.AccentGold, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { onOpenPlan() }.padding(4.dp))
-                Text("•", color = LuxuryColors.WarmGray, fontSize = 11.sp)
-                Text("JOURNEY", color = LuxuryColors.AccentGold, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { onOpenJourney() }.padding(4.dp))
-                Text("•", color = LuxuryColors.WarmGray, fontSize = 11.sp)
-                Text("MOMENTS", color = LuxuryColors.AccentGold, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { onOpenMoments() }.padding(4.dp))
-                Text("•", color = LuxuryColors.WarmGray, fontSize = 11.sp)
-                Text("INSIGHTS", color = LuxuryColors.AccentGold, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { onOpenInsights() }.padding(4.dp))
-                Text("•", color = LuxuryColors.WarmGray, fontSize = 11.sp)
-                Text("FINALE", color = LuxuryColors.AccentGold, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { onOpenFinale() }.padding(4.dp))
+                Text("PLAN", color = LuxuryColors.AccentGold, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { onOpenPlan() }.padding(4.dp))
+                Text("•", color = LuxuryColors.WarmGray, fontSize = 10.sp)
+                Text("JOURNEY", color = LuxuryColors.AccentGold, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { onOpenJourney() }.padding(4.dp))
+                Text("•", color = LuxuryColors.WarmGray, fontSize = 10.sp)
+                Text("MOMENTS", color = LuxuryColors.AccentGold, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { onOpenMoments() }.padding(4.dp))
+                Text("•", color = LuxuryColors.WarmGray, fontSize = 10.sp)
+                Text("INSIGHTS", color = LuxuryColors.AccentGold, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { onOpenInsights() }.padding(4.dp))
+                Text("•", color = LuxuryColors.WarmGray, fontSize = 10.sp)
+                Text("FINALE", color = LuxuryColors.AccentGold, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { onOpenFinale() }.padding(4.dp))
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
+            // Dedicated Legacy Session Timer Display
             Card(
                 colors = CardDefaults.cardColors(containerColor = Color(0xFF121212)),
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, Color(0xFF2C2C2E)),
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, LuxuryColors.AccentGold),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(text = "PROGRESS STATUS", color = LuxuryColors.WarmGray, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
-                    Text(text = progress.status.name, color = LuxuryColors.AccentGold, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    val targetH = legacy.targetDurationMillis / 3600000L
-                    val actualH = progress.actualTimeMillis / 3600000L
-                    Text(text = "LOGGED TIME: ${actualH}h / ${targetH}h", color = LuxuryColors.CreamyWhite, fontSize = 13.sp)
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "LEGACY TIMER SESSION",
+                        style = TextStyle(color = LuxuryColors.AccentGold, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                    )
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    LinearProgressIndicator(
-                        progress = { progress.progressFraction },
-                        modifier = Modifier.fillMaxWidth().height(4.dp),
-                        color = LuxuryColors.AccentGold,
-                        trackColor = Color(0xFF2C2C2E)
+                    TimeDisplay(
+                        elapsedTimeMs = sessionElapsedMs,
+                        showCentiseconds = true,
+                        baseStyle = TextStyle(color = LuxuryColors.CreamyWhite, fontSize = 42.sp),
+                        scaleFactor = 1.0f,
+                        accentColor = LuxuryColors.AccentGold
                     )
 
-                    if (recovery.hoursBehind > 0f) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(text = "RECOVERY MODE", color = Color(0xFFC94A4A), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                        Text(text = recovery.suggestion, color = LuxuryColors.CreamyWhite, fontSize = 11.sp, fontWeight = FontWeight.Light)
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Start / Pause button
+                        Button(
+                            onClick = {
+                                if (isTimerRunning) {
+                                    isTimerRunning = false
+                                    accumulatedTimeMs = sessionElapsedMs
+                                } else {
+                                    isTimerRunning = true
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isTimerRunning) Color(0xFF9E2A2B) else LuxuryColors.AccentGold
+                            ),
+                            shape = RoundedCornerShape(20.dp)
+                        ) {
+                            Text(
+                                text = if (isTimerRunning) "PAUSE" else "START LEGACY",
+                                color = LuxuryColors.WarmBlack,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        // Stop & Record button
+                        if (sessionElapsedMs > 0L) {
+                            Button(
+                                onClick = {
+                                    isTimerRunning = false
+                                    val finalMs = sessionElapsedMs
+                                    sessionElapsedMs = 0L
+                                    accumulatedTimeMs = 0L
+                                    scope.launch {
+                                        settingsRepository.recordLegacyTimerSession(legacy.id, finalMs)
+                                        onReload()
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2C2C2E)),
+                                shape = RoundedCornerShape(20.dp),
+                                border = BorderStroke(1.dp, LuxuryColors.WarmGray)
+                            ) {
+                                Text("STOP & LOG", color = LuxuryColors.CreamyWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Action Row: Add Manual Time & Postpone Legacy
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Button(
+                    onClick = { showManualModal = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A1A1A)),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, Color(0xFF2C2C2E)),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("+ ADD MANUAL TIME", color = LuxuryColors.AccentGold, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Button(
+                    onClick = { showPostponeModal = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A1A1A)),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, Color(0xFF2C2C2E)),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("+ POSTPONE LEGACY", color = LuxuryColors.CreamyWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Overview Dashboard Stats
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF121212)),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, Color(0xFF2C2C2E)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("DAYS REMAINING", color = LuxuryColors.WarmGray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                Text("${progress.remainingDays} / ${progress.totalDays} DAYS", color = LuxuryColors.CreamyWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("TOTAL TARGET", color = LuxuryColors.WarmGray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                Text("${progress.plannedTimeMillis / 3600000L} HOURS", color = LuxuryColors.CreamyWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("TIMER SESSIONS", color = LuxuryColors.WarmGray, fontSize = 10.sp)
+                                Text("${progress.timerSessionsTimeMillis / 3600000L}h ${(progress.timerSessionsTimeMillis % 3600000L) / 60000L}m", color = LuxuryColors.AccentGold, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            }
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("MANUAL TIME", color = LuxuryColors.WarmGray, fontSize = 10.sp)
+                                Text("${progress.manualEntriesTimeMillis / 3600000L}h ${(progress.manualEntriesTimeMillis % 3600000L) / 60000L}m", color = LuxuryColors.CreamyWhite, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("RECALCULATED DAILY TARGET", color = LuxuryColors.WarmGray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                val dailyTargetHours = progress.requiredDailyTargetMillis.toFloat() / 3600000f
+                                Text(String.format("%.1fh / day", dailyTargetHours), color = LuxuryColors.AccentGold, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            if (recovery.hoursBehind > 0f) {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Text("RECOVERY STATUS", color = Color(0xFFC94A4A), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                Text(recovery.suggestion, color = LuxuryColors.CreamyWhite, fontSize = 11.sp, fontWeight = FontWeight.Light)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Manual Time Modal
+    if (showManualModal) {
+        androidx.compose.ui.window.Dialog(onDismissRequest = { showManualModal = false }) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF121212)),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, Color(0xFF2C2C2E)),
+                modifier = Modifier.fillMaxWidth().padding(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("+ ADD MANUAL TIME", style = TextStyle(color = LuxuryColors.AccentGold, fontSize = 14.sp, fontWeight = FontWeight.Bold))
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    settingsRepository.addLegacyManualTime(legacy.id, 1800000L, "Quick +30m")
+                                    onReload()
+                                    showManualModal = false
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E1E1E)),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("+30 MINS", color = LuxuryColors.AccentGold, fontSize = 10.sp)
+                        }
+
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    settingsRepository.addLegacyManualTime(legacy.id, 3600000L, "Quick +1h")
+                                    onReload()
+                                    showManualModal = false
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E1E1E)),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("+1 HOUR", color = LuxuryColors.AccentGold, fontSize = 10.sp)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = customManualHoursText,
+                            onValueChange = { customManualHoursText = it },
+                            label = { Text("Hours", color = LuxuryColors.WarmGray, fontSize = 10.sp) },
+                            textStyle = TextStyle(color = LuxuryColors.CreamyWhite, fontSize = 12.sp),
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        OutlinedTextField(
+                            value = customManualMinsText,
+                            onValueChange = { customManualMinsText = it },
+                            label = { Text("Minutes", color = LuxuryColors.WarmGray, fontSize = 10.sp) },
+                            textStyle = TextStyle(color = LuxuryColors.CreamyWhite, fontSize = 12.sp),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedTextField(
+                        value = manualNote,
+                        onValueChange = { manualNote = it },
+                        label = { Text("Optional Note / Activity", color = LuxuryColors.WarmGray, fontSize = 10.sp) },
+                        textStyle = TextStyle(color = LuxuryColors.CreamyWhite, fontSize = 12.sp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        Text("CANCEL", color = LuxuryColors.WarmGray, fontSize = 11.sp, modifier = Modifier.clickable { showManualModal = false }.padding(10.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                val hrs = customManualHoursText.toLongOrNull() ?: 0L
+                                val mins = customManualMinsText.toLongOrNull() ?: 0L
+                                val totalMs = (hrs * 60 + mins) * 60000L
+                                if (totalMs > 0L) {
+                                    scope.launch {
+                                        settingsRepository.addLegacyManualTime(legacy.id, totalMs, manualNote.ifBlank { "Manual Addition" })
+                                        onReload()
+                                        showManualModal = false
+                                    }
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = LuxuryColors.AccentGold)
+                        ) {
+                            Text("LOG TIME", color = LuxuryColors.WarmBlack, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Postpone Legacy Modal
+    if (showPostponeModal) {
+        androidx.compose.ui.window.Dialog(onDismissRequest = { showPostponeModal = false }) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF121212)),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, Color(0xFF2C2C2E)),
+                modifier = Modifier.fillMaxWidth().padding(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("POSTPONE LEGACY", style = TextStyle(color = LuxuryColors.CreamyWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold))
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text("Add days to your legacy timeline. Existing progress and session logs will be fully preserved.", style = TextStyle(color = LuxuryColors.WarmGray, fontSize = 11.sp))
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = postponeDaysText,
+                        onValueChange = { postponeDaysText = it },
+                        label = { Text("Days to Add", color = LuxuryColors.WarmGray, fontSize = 10.sp) },
+                        textStyle = TextStyle(color = LuxuryColors.CreamyWhite, fontSize = 12.sp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedTextField(
+                        value = postponeReason,
+                        onValueChange = { postponeReason = it },
+                        label = { Text("Reason for Postponing", color = LuxuryColors.WarmGray, fontSize = 10.sp) },
+                        textStyle = TextStyle(color = LuxuryColors.CreamyWhite, fontSize = 12.sp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        Text("CANCEL", color = LuxuryColors.WarmGray, fontSize = 11.sp, modifier = Modifier.clickable { showPostponeModal = false }.padding(10.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                val addedDays = postponeDaysText.toIntOrNull() ?: 0
+                                if (addedDays > 0) {
+                                    scope.launch {
+                                        settingsRepository.postponeLegacy(legacy.id, addedDays, postponeReason.ifBlank { "Postponed timeline" })
+                                        onReload()
+                                        showPostponeModal = false
+                                    }
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = LuxuryColors.AccentGold)
+                        ) {
+                            Text("CONFIRM POSTPONE", color = LuxuryColors.WarmBlack, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
