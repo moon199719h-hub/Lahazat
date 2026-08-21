@@ -448,7 +448,7 @@ fun MainScreen(
             )
         }
 
-        // Top label - Tapping cycles mode (Stopwatch -> Countdown -> Counter -> Intervals -> Time Legacy)
+        // Top label - Tapping cycles mode (Stopwatch -> Countdown -> Counter -> Intervals -> Legacy)
         Column(
             modifier = Modifier
                 .align(Alignment.TopStart)
@@ -461,7 +461,7 @@ fun MainScreen(
                     AppMode.Countdown -> "COUNTDOWN ▾"
                     AppMode.Counter -> "COUNTER ▾"
                     AppMode.Intervals -> "INTERVALS ▾"
-                    AppMode.TimeLegacy -> "TIME LEGACY ▾"
+                    AppMode.TimeLegacy -> "LEGACY ▾"
                 },
                 style = TextStyle(
                     color = currentTextColor,
