@@ -228,6 +228,8 @@ fun MainScreen(
         return
     }
 
+    val backgroundPreset by settingsRepository.backgroundPreset.collectAsState(initial = "OFF")
+
     // Layout configuration based on the illumination Mode
     val currentBgColor = when (themeMode) {
         "Midnight", "Midnight Dark", "Obsidian Dark" -> Color(0xFF000000)
@@ -253,8 +255,16 @@ fun MainScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(currentBgColor)
-            .padding(24.dp)
-            .pointerInput(Unit) {
+    ) {
+        if (backgroundPreset == "STELLAR") {
+            com.floating.stopwatch.ui.components.StellarBackground()
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp)
+                .pointerInput(Unit) {
                 detectTapGestures(
                     onTap = {
                         resetAutoHideTimer()
@@ -1156,6 +1166,7 @@ fun MainScreen(
                 )
             }
         }
+        }
     }
 
     // Slide-up bottom sheet for luxury clean laps listing
@@ -1528,15 +1539,37 @@ fun CategoryContent(
     val hapticIntensity by settingsRepository.hapticIntensity.collectAsState(initial = "Medium")
     val themeMode by settingsRepository.themeMode.collectAsState(initial = "Midnight")
     val mainDisplayScale by settingsRepository.mainDisplayScale.collectAsState(initial = 1.0f)
+    val backgroundPreset by settingsRepository.backgroundPreset.collectAsState(initial = "OFF")
 
     val shapes = listOf("rounded", "capsule", "circle", "sharp", "glass")
     val themeModes = listOf("Midnight Dark", "Warm Paper Light", "Obsidian Dark", "Pure White Light")
     val presets = listOf("Glass Premium", "Obsidian", "Titanium", "Ultra Minimal")
     val intensities = listOf("Off", "Light", "Medium", "Strong")
     val colorPresets = listOf("Gold", "Galaxy Blue", "Titanium", "Emerald", "Sapphire", "Violet", "Rose", "Ice", "Amber", "Pure White")
+    val bgPresets = listOf("OFF", "MIDNIGHT", "STELLAR")
 
     when (categoryName.uppercase()) {
         "APPEARANCE" -> {
+            Text("BACKGROUND ATMOSPHERE", color = LuxuryColors.WarmGray, fontSize = 10.sp, letterSpacing = 1.8.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+                bgPresets.forEach { bg ->
+                    val isSel = backgroundPreset == bg
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(if (isSel) accentColor.copy(alpha = 0.2f) else Color(0xFF161616))
+                            .clickable { scope.launch { settingsRepository.setBackgroundPreset(bg) } }
+                            .padding(8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(bg, color = if (isSel) LuxuryColors.CreamyWhite else LuxuryColors.WarmGray, fontSize = 10.sp)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
             Text("ILLUMINATION MODE", color = LuxuryColors.WarmGray, fontSize = 10.sp, letterSpacing = 1.8.sp)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
                 themeModes.forEach { mode ->

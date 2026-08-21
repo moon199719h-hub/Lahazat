@@ -31,6 +31,13 @@ class SettingsRepository(private val context: Context) {
         val INTERVAL_ROUNDS = intPreferencesKey("interval_rounds")
         val CUSTOM_INTERVAL_TEMPLATES = stringPreferencesKey("custom_interval_templates")
         val TIME_LEGACIES_JSON = stringPreferencesKey("time_legacies_json")
+        val BACKGROUND_PRESET = stringPreferencesKey("background_preset")
+    }
+
+    val backgroundPreset: Flow<String> = context.dataStore.data.map { it[BACKGROUND_PRESET] ?: "OFF" }
+
+    suspend fun setBackgroundPreset(preset: String) {
+        context.dataStore.edit { it[BACKGROUND_PRESET] = preset }
     }
 
     val timeLegaciesJson: Flow<String> = context.dataStore.data.map { it[TIME_LEGACIES_JSON] ?: "[]" }
