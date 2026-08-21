@@ -30,12 +30,8 @@ import com.floating.stopwatch.domain.StopwatchEngine
 import com.floating.stopwatch.service.StopwatchService
 import com.floating.stopwatch.ui.AppMode
 import com.floating.stopwatch.ui.MainViewModel
-import com.floating.stopwatch.ui.screens.GamificationScreen
-import com.floating.stopwatch.ui.screens.GoalsScreen
 import com.floating.stopwatch.ui.screens.MainScreen
-import com.floating.stopwatch.ui.screens.ScenesScreen
 import com.floating.stopwatch.ui.screens.SettingsScreen
-import com.floating.stopwatch.ui.screens.TimeMemoryScreen
 import com.floating.stopwatch.ui.theme.LuxuryColors
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
@@ -185,49 +181,11 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                     mainSize = mainDisplayScale,
                     accentColor = accentColor,
                     themeMode = themeMode,
-                    onNavigateToSettings = { currentScreen = "Settings" },
-                    onNavigateToGoals = { currentScreen = "Goals" },
-                    onNavigateToMemories = { currentScreen = "Memories" },
-                    onNavigateToScenes = { currentScreen = "Scenes" },
-                    onNavigateToGamification = { currentScreen = "Gamification" }
+                    onNavigateToSettings = { currentScreen = "Settings" }
                 )
 
                 if (currentScreen == "Settings") {
                     SettingsScreen(
-                        settingsRepository = settingsRepository,
-                        onBack = { currentScreen = "Main" }
-                    )
-                } else if (currentScreen == "Goals") {
-                    GoalsScreen(
-                        settingsRepository = settingsRepository,
-                        onBack = { currentScreen = "Main" }
-                    )
-                } else if (currentScreen == "Memories") {
-                    TimeMemoryScreen(
-                        settingsRepository = settingsRepository,
-                        onBack = { currentScreen = "Main" }
-                    )
-                } else if (currentScreen == "Scenes") {
-                    ScenesScreen(
-                        settingsRepository = settingsRepository,
-                        onBack = { currentScreen = "Main" },
-                        onSelectScene = { scene ->
-                            // Apply scene configuration
-                            lifecycleScope.launch {
-                                when (scene.mode) {
-                                    "stopwatch" -> mainViewModel.setMode(AppMode.Stopwatch)
-                                    "countdown" -> {
-                                        mainViewModel.setMode(AppMode.Countdown)
-                                        mainViewModel.setCountdownDurationMs(scene.presetDurationMs)
-                                    }
-                                    "interval" -> mainViewModel.setMode(AppMode.Intervals)
-                                }
-                                settingsRepository.setHapticIntensity(scene.hapticBehavior)
-                            }
-                        }
-                    )
-                } else if (currentScreen == "Gamification") {
-                    GamificationScreen(
                         settingsRepository = settingsRepository,
                         onBack = { currentScreen = "Main" }
                     )
