@@ -1,5 +1,12 @@
 package com.floating.stopwatch.ui.screens
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -9,15 +16,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.core.tween
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,19 +33,17 @@ import com.floating.stopwatch.ui.components.DragAdjustField
 import com.floating.stopwatch.ui.theme.LuxuryColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import androidx.activity.compose.BackHandler
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     settingsRepository: SettingsRepository,
     onBack: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    val detailSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     var activeDialogCategory by remember { mutableStateOf<String?>(null) }
-    var isClosing by remember { mutableStateOf(false) }
+    var isClosingMain by remember { mutableStateOf(false) }
+    var isClosingSub by remember { mutableStateOf(false) }
 
     val stylePreset by settingsRepository.stylePreset.collectAsState(initial = "Glass Premium")
     val colorPreset by settingsRepository.colorPreset.collectAsState(initial = "Gold")
@@ -52,15 +51,6 @@ fun SettingsScreen(
     val hapticIntensity by settingsRepository.hapticIntensity.collectAsState(initial = "Medium")
     val themeMode by settingsRepository.themeMode.collectAsState(initial = "Midnight")
     val mainDisplayScale by settingsRepository.mainDisplayScale.collectAsState(initial = 1.0f)
-
-    var customR by remember { mutableFloatStateOf(201f) }
-    var customG by remember { mutableFloatStateOf(166f) }
-    var customB by remember { mutableFloatStateOf(107f) }
-
-    fun updateCustomColor() {
-        val hex = String.format("#%02X%02X%02X", customR.toInt(), customG.toInt(), customB.toInt())
-        scope.launch { settingsRepository.setCustomColorHex(hex) }
-    }
 
     val shapes = listOf("rounded", "capsule", "circle", "sharp", "glass")
     val themeModes = listOf("Midnight Dark", "Warm Paper Light", "Obsidian Dark", "Pure White Light")
@@ -74,23 +64,34 @@ fun SettingsScreen(
     )
 
     fun dismissSettings() {
-        isClosing = true
+        if (activeDialogCategory != null) {
+            isClosingSub = true
+        } else {
+            isClosingMain = true
+        }
     }
 
-    LaunchedEffect(isClosing) {
-        if (isClosing) {
+    fun dismissCategory() {
+        isClosingSub = true
+    }
+
+    LaunchedEffect(isClosingMain) {
+        if (isClosingMain) {
             delay(180)
             onBack()
         }
     }
 
-    BackHandler(onBack = { dismissSettings() })
-
-    fun dismissCategory() {
-        scope.launch {
-            detailSheetState.hide()
+    LaunchedEffect(isClosingSub) {
+        if (isClosingSub) {
+            delay(150)
             activeDialogCategory = null
+            isClosingSub = false
         }
+    }
+
+    BackHandler(enabled = true) {
+        dismissSettings()
     }
 
     val activeAccentColor = if (colorPreset == "Custom") {
@@ -99,419 +100,540 @@ fun SettingsScreen(
         LuxuryColors.fromName(colorPreset)
     }
 
+    // Main Floating Settings Window Overlay
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.62f))
             .clickable { dismissSettings() }
     ) {
-        val panelMaxHeight = (maxHeight - 32.dp).coerceAtMost(680.dp)
-        AnimatedVisibility(
-            visible = !isClosing,
-            modifier = Modifier.align(Alignment.TopCenter),
-            enter = slideInVertically(
-                animationSpec = tween(180),
-                initialOffsetY = { -it }
-            ) + fadeIn(animationSpec = tween(150)),
-            exit = slideOutVertically(
-                animationSpec = tween(150),
-                targetOffsetY = { -it }
-            ) + fadeOut(animationSpec = tween(120))
-        ) {
-            Surface(
+        val panelMaxHeight = (maxHeight - 48.dp).coerceAtMost(640.dp)
+
+        // Category Detail Submenu Floating Window Overlay
+        if (activeDialogCategory != null) {
+            val category = activeDialogCategory!!
+            AnimatedVisibility(
+                visible = !isClosingSub,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 720.dp)
-                    .padding(horizontal = 12.dp)
-                    .heightIn(max = panelMaxHeight)
-                    .wrapContentHeight()
-                    .statusBarsPadding()
-                    .imePadding()
+                    .align(Alignment.Center)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
                     ) {},
-                shape = RoundedCornerShape(bottomStart = 22.dp, bottomEnd = 22.dp),
-                color = LuxuryColors.WarmBlack,
-                tonalElevation = 0.dp,
-                shadowElevation = 8.dp
+                enter = slideInVertically(
+                    animationSpec = tween(180),
+                    initialOffsetY = { -it / 2 }
+                ) + fadeIn(animationSpec = tween(150)),
+                exit = slideOutVertically(
+                    animationSpec = tween(150),
+                    targetOffsetY = { -it / 2 }
+                ) + fadeOut(animationSpec = tween(120))
             ) {
-                Column(
+                Surface(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .imePadding()
-                        .widthIn(max = 720.dp)
-                        .padding(horizontal = 16.dp)
-                        .padding(bottom = 12.dp)
+                        .fillMaxWidth(0.92f)
+                        .widthIn(max = 680.dp)
+                        .heightIn(max = panelMaxHeight)
+                        .wrapContentHeight()
+                        .statusBarsPadding()
+                        .imePadding(),
+                    shape = RoundedCornerShape(20.dp),
+                    color = LuxuryColors.WarmBlack,
+                    border = BorderStroke(1.dp, activeAccentColor.copy(alpha = 0.35f)),
+                    tonalElevation = 0.dp,
+                    shadowElevation = 12.dp
                 ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 2.dp, bottom = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "SETTINGS",
-                        color = LuxuryColors.CreamyWhite,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Light,
-                        letterSpacing = 3.sp
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "SETTINGS CATEGORIES",
-                        color = LuxuryColors.WarmGray,
-                        fontSize = 10.sp,
-                        letterSpacing = 2.sp
-                    )
-                }
-                Text(
-                    text = "CLOSE",
-                    color = LuxuryColors.WarmGray,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = 1.5.sp,
-                    modifier = Modifier
-                        .clickable { dismissSettings() }
-                        .padding(10.dp)
-                )
-            }
-
-                    LazyVerticalGrid(
-                        columns = GridCells.Adaptive(minSize = 148.dp),
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(
-                                min = 220.dp,
-                                max = (panelMaxHeight - 100.dp).coerceAtLeast(220.dp)
-                            ),
-                        horizontalArrangement = Arrangement.spacedBy(7.dp),
-                        verticalArrangement = Arrangement.spacedBy(7.dp),
-                        contentPadding = PaddingValues(bottom = 4.dp)
+                            .padding(20.dp)
+                            .verticalScroll(rememberScrollState())
                     ) {
-                        items(categories, key = { it }) { categoryName ->
-                            val isPriority = categoryName == "Appearance" || categoryName == "Stopwatch"
-                            Card(
-                                colors = CardDefaults.cardColors(
-                                    containerColor = if (isPriority) Color(0xFF151412) else Color(0xFF111111)
-                                ),
-                                shape = RoundedCornerShape(10.dp),
-                                border = BorderStroke(
-                                    1.dp,
-                                    if (isPriority) activeAccentColor.copy(alpha = 0.2f)
-                                    else Color.White.copy(alpha = 0.08f)
-                                ),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(72.dp)
-                                    .clickable { activeDialogCategory = categoryName }
-                            ) {
-                                Column(
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "‹ BACK",
+                                    color = activeAccentColor,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.5.sp,
                                     modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(horizontal = 10.dp, vertical = 9.dp),
-                                    verticalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(6.dp)
-                                            .background(
-                                                activeAccentColor.copy(alpha = 0.8f),
-                                                RoundedCornerShape(3.dp)
-                                            )
+                                        .clickable { dismissCategory() }
+                                        .padding(vertical = 6.dp, horizontal = 4.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = category.uppercase(),
+                                    style = TextStyle(
+                                        color = LuxuryColors.CreamyWhite,
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Light,
+                                        letterSpacing = 2.5.sp
                                     )
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.Bottom
-                                    ) {
-                                        Text(
-                                            text = categoryName.uppercase(),
-                                            color = LuxuryColors.CreamyWhite,
-                                            fontSize = 11.sp,
-                                            lineHeight = 14.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            letterSpacing = 0.8.sp,
-                                            maxLines = 2,
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                        Text(
-                                            text = "▸",
-                                            color = activeAccentColor.copy(alpha = 0.8f),
-                                            fontSize = 13.sp
-                                        )
+                                )
+                            }
+                            Text(
+                                text = "✕",
+                                color = LuxuryColors.WarmGray,
+                                fontSize = 16.sp,
+                                modifier = Modifier
+                                    .clickable { dismissCategory() }
+                                    .padding(8.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        when (category) {
+                            "Appearance" -> {
+                                Text(
+                                    text = "ILLUMINATION MODE",
+                                    color = LuxuryColors.WarmGray,
+                                    fontSize = 10.sp,
+                                    letterSpacing = 1.8.sp
+                                )
+                                ResponsiveOptionGrid(
+                                    options = themeModes,
+                                    selectedOption = themeMode,
+                                    accentColor = activeAccentColor,
+                                    onOptionSelected = { mode -> scope.launch { settingsRepository.setThemeMode(mode) } }
+                                )
+
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                Text(
+                                    text = "STYLE PRESET",
+                                    color = LuxuryColors.WarmGray,
+                                    fontSize = 10.sp,
+                                    letterSpacing = 1.8.sp
+                                )
+                                ResponsiveOptionGrid(
+                                    options = presets,
+                                    selectedOption = stylePreset,
+                                    accentColor = activeAccentColor,
+                                    onOptionSelected = { preset -> scope.launch { settingsRepository.setStylePreset(preset) } }
+                                )
+
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                Text(
+                                    text = "COLOR ACCENT PRESET",
+                                    color = LuxuryColors.WarmGray,
+                                    fontSize = 10.sp,
+                                    letterSpacing = 1.8.sp
+                                )
+                                ResponsiveOptionGrid(
+                                    options = colorPresets,
+                                    selectedOption = colorPreset,
+                                    accentColor = activeAccentColor,
+                                    onOptionSelected = { color -> scope.launch { settingsRepository.setColorPreset(color) } }
+                                )
+
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                DragAdjustField(
+                                    label = "MAIN DISPLAY SIZE",
+                                    value = mainDisplayScale,
+                                    minValue = 0.7f,
+                                    maxValue = 1.3f,
+                                    pixelsPerUnit = 180f,
+                                    accentColor = activeAccentColor,
+                                    valueFormatter = { String.format("%.2fx", it) },
+                                    onValueChange = { scope.launch { settingsRepository.setMainDisplayScale(it) } }
+                                )
+                            }
+                            "Stopwatch" -> WidgetCategorySettings(
+                                index = 0,
+                                widgetTitle = "STOPWATCH",
+                                settingsRepository = settingsRepository,
+                                scope = scope
+                            )
+                            "Countdown" -> WidgetCategorySettings(
+                                index = 1,
+                                widgetTitle = "COUNTDOWN",
+                                settingsRepository = settingsRepository,
+                                scope = scope
+                            )
+                            "Counter" -> WidgetCategorySettings(
+                                index = 2,
+                                widgetTitle = "COUNTER",
+                                settingsRepository = settingsRepository,
+                                scope = scope
+                            )
+                            "Interval" -> {
+                                val intervalName by settingsRepository.intervalName.collectAsState(initial = "HIT")
+                                val workMs by settingsRepository.intervalWorkMs.collectAsState(initial = 40000L)
+                                val restMs by settingsRepository.intervalRestMs.collectAsState(initial = 20000L)
+                                val rounds by settingsRepository.intervalRounds.collectAsState(initial = 8)
+
+                                var nameInput by remember(intervalName) { mutableStateOf(intervalName) }
+                                var workSecs by remember(workMs) { mutableIntStateOf((workMs / 1000).toInt()) }
+                                var restSecs by remember(restMs) { mutableIntStateOf((restMs / 1000).toInt()) }
+                                var roundsVal by remember(rounds) { mutableIntStateOf(rounds) }
+
+                                Text(
+                                    text = "INTERVAL CONFIGURATION",
+                                    color = LuxuryColors.WarmGray,
+                                    fontSize = 10.sp,
+                                    letterSpacing = 1.8.sp
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                OutlinedTextField(
+                                    value = nameInput,
+                                    onValueChange = { nameInput = it },
+                                    label = { Text("Interval Name", color = LuxuryColors.WarmGray, fontSize = 10.sp) },
+                                    textStyle = TextStyle(color = LuxuryColors.CreamyWhite, fontSize = 12.sp),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                DragAdjustField(
+                                    label = "WORK DURATION",
+                                    value = workSecs.toFloat(),
+                                    minValue = 1f,
+                                    maxValue = 18000f,
+                                    pixelsPerUnit = 4f,
+                                    accentColor = activeAccentColor,
+                                    valueFormatter = { formatSettingsDuration(it.toInt()) },
+                                    onValueChange = { workSecs = it.toInt().coerceIn(1, 18000) }
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                DragAdjustField(
+                                    label = "REST DURATION",
+                                    value = restSecs.toFloat(),
+                                    minValue = 1f,
+                                    maxValue = 3600f,
+                                    pixelsPerUnit = 4f,
+                                    accentColor = activeAccentColor,
+                                    valueFormatter = { formatSettingsDuration(it.toInt()) },
+                                    onValueChange = { restSecs = it.toInt().coerceIn(1, 3600) }
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "ROUNDS: $roundsVal",
+                                        color = LuxuryColors.CreamyWhite,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Row {
+                                        Box(
+                                            modifier = Modifier
+                                                .clickable { if (roundsVal > 1) roundsVal -= 1 }
+                                                .padding(8.dp)
+                                        ) {
+                                            Text("-", color = activeAccentColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                        Box(
+                                            modifier = Modifier
+                                                .clickable { roundsVal += 1 }
+                                                .padding(8.dp)
+                                        ) {
+                                            Text("+", color = activeAccentColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                        }
                                     }
+                                }
+
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                Button(
+                                    onClick = {
+                                        scope.launch {
+                                            settingsRepository.setIntervalConfig(
+                                                name = nameInput.ifBlank { "HIT" },
+                                                workMs = workSecs * 1000L,
+                                                restMs = restSecs * 1000L,
+                                                rounds = roundsVal
+                                            )
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = activeAccentColor),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = "SAVE CONFIGURATION",
+                                        color = LuxuryColors.WarmBlack,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 1.sp
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                WidgetCategorySettings(
+                                    index = 3,
+                                    widgetTitle = "INTERVAL",
+                                    settingsRepository = settingsRepository,
+                                    scope = scope
+                                )
+                            }
+                            "Floating Widgets" -> {
+                                val shapePreset by settingsRepository.shapePreset.collectAsState(initial = "rounded")
+                                val floatingPadding by settingsRepository.floatingPadding.collectAsState(initial = 6.0f)
+                                val floatingOpacity by settingsRepository.floatingOpacity.collectAsState(initial = 0.85f)
+
+                                Text(
+                                    text = "SHAPE PRESET",
+                                    color = LuxuryColors.WarmGray,
+                                    fontSize = 10.sp,
+                                    letterSpacing = 1.8.sp
+                                )
+                                ResponsiveOptionGrid(
+                                    options = shapes,
+                                    selectedOption = shapePreset,
+                                    accentColor = activeAccentColor,
+                                    onOptionSelected = { shape -> scope.launch { settingsRepository.setShapePreset(shape) } },
+                                    displayName = { it.uppercase() }
+                                )
+
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                DragAdjustField(
+                                    label = "PADDING",
+                                    value = floatingPadding,
+                                    minValue = 0f,
+                                    maxValue = 32f,
+                                    pixelsPerUnit = 8f,
+                                    accentColor = activeAccentColor,
+                                    valueFormatter = { "${it.toInt()}dp" },
+                                    onValueChange = { scope.launch { settingsRepository.setFloatingPadding(it) } }
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                DragAdjustField(
+                                    label = "OPACITY",
+                                    value = floatingOpacity,
+                                    minValue = 0f,
+                                    maxValue = 1f,
+                                    pixelsPerUnit = 180f,
+                                    accentColor = activeAccentColor,
+                                    valueFormatter = { "${(it * 100).toInt()}%" },
+                                    onValueChange = { scope.launch { settingsRepository.setFloatingOpacity(it) } }
+                                )
+                            }
+                            "Sounds & Haptics" -> {
+                                Text(
+                                    text = "HAPTIC FEEDBACK INTENSITY",
+                                    color = LuxuryColors.WarmGray,
+                                    fontSize = 10.sp,
+                                    letterSpacing = 1.8.sp
+                                )
+                                ResponsiveOptionGrid(
+                                    options = intensities,
+                                    selectedOption = hapticIntensity,
+                                    accentColor = activeAccentColor,
+                                    onOptionSelected = { intensity -> scope.launch { settingsRepository.setHapticIntensity(intensity) } }
+                                )
+                            }
+                            "Advanced" -> {
+                                val volumeCounterScreenOffEnabled by settingsRepository.volumeCounterScreenOffEnabled.collectAsState(initial = false)
+                                val layoutOrientation by settingsRepository.layoutOrientation.collectAsState(initial = "horizontal")
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "VOLUME KEYS COUNTER (SCREEN OFF)",
+                                        color = LuxuryColors.CreamyWhite,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Switch(
+                                        checked = volumeCounterScreenOffEnabled,
+                                        onCheckedChange = { scope.launch { settingsRepository.setVolumeCounterScreenOffEnabled(it) } },
+                                        colors = SwitchDefaults.colors(checkedThumbColor = activeAccentColor)
+                                    )
+                                }
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "VERTICAL DISPLAY ORIENTATION",
+                                        color = LuxuryColors.CreamyWhite,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Switch(
+                                        checked = layoutOrientation == "vertical",
+                                        onCheckedChange = { scope.launch { settingsRepository.setLayoutOrientation(if (it) "vertical" else "horizontal") } },
+                                        colors = SwitchDefaults.colors(checkedThumbColor = activeAccentColor)
+                                    )
                                 }
                             }
                         }
                     }
                 }
             }
-        }
-    }
-
-    // Nested category panel
-    activeDialogCategory?.let { category ->
-        val activeAccentColor = if (colorPreset == "Custom") {
-            try { Color(android.graphics.Color.parseColor(customColorHex)) } catch (e: Exception) { LuxuryColors.AccentGold }
         } else {
-            LuxuryColors.fromName(colorPreset)
-        }
-        ModalBottomSheet(
-            onDismissRequest = { dismissCategory() },
-            sheetState = detailSheetState,
-            shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp),
-            containerColor = LuxuryColors.WarmBlack,
-            contentColor = LuxuryColors.CreamyWhite,
-            tonalElevation = 0.dp,
-            scrimColor = Color.Black.copy(alpha = 0.5f),
-            dragHandle = {
-                BottomSheetDefaults.DragHandle(color = LuxuryColors.WarmGray.copy(alpha = 0.55f))
-            }
-        ) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0A0A)),
-                shape = RoundedCornerShape(16.dp),
-                border = BorderStroke(1.dp, Color(0xFF2C2C2E)),
+            AnimatedVisibility(
+                visible = !isClosingMain,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 720.dp)
-                    .align(Alignment.CenterHorizontally)
-                    .padding(horizontal = 12.dp)
+                    .align(Alignment.TopCenter)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {},
+                enter = slideInVertically(
+                    animationSpec = tween(180),
+                    initialOffsetY = { -it }
+                ) + fadeIn(animationSpec = tween(150)),
+                exit = slideOutVertically(
+                    animationSpec = tween(150),
+                    targetOffsetY = { -it }
+                ) + fadeOut(animationSpec = tween(120))
             ) {
-                Column(
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .imePadding()
-                        .padding(20.dp)
-                        .verticalScroll(rememberScrollState())
+                        .widthIn(max = 720.dp)
+                        .padding(horizontal = 12.dp)
+                        .heightIn(max = panelMaxHeight)
+                        .wrapContentHeight()
+                        .statusBarsPadding()
+                        .imePadding(),
+                    shape = RoundedCornerShape(bottomStart = 22.dp, bottomEnd = 22.dp),
+                    color = LuxuryColors.WarmBlack,
+                    border = BorderStroke(1.dp, activeAccentColor.copy(alpha = 0.22f)),
+                    tonalElevation = 0.dp,
+                    shadowElevation = 8.dp
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .imePadding()
+                            .widthIn(max = 720.dp)
+                            .padding(horizontal = 16.dp)
+                            .padding(bottom = 12.dp)
                     ) {
-                        Text(
-                            text = category.uppercase(),
-                            style = TextStyle(color = activeAccentColor, fontSize = 14.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-                        )
-                        Text(
-                            text = "✕",
-                            color = LuxuryColors.WarmGray,
-                            fontSize = 16.sp,
-                            modifier = Modifier.clickable { dismissCategory() }.padding(4.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    when (category) {
-                        "Appearance" -> {
-                            Text(text = "ILLUMINATION MODE", color = LuxuryColors.WarmGray, fontSize = 10.sp, letterSpacing = 1.sp)
-                            ResponsiveOptionGrid(
-                                options = themeModes,
-                                selectedOption = themeMode,
-                                accentColor = activeAccentColor,
-                                onOptionSelected = { mode -> scope.launch { settingsRepository.setThemeMode(mode) } }
-                            )
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Text(text = "STYLE PRESET", color = LuxuryColors.WarmGray, fontSize = 10.sp, letterSpacing = 1.sp)
-                            ResponsiveOptionGrid(
-                                options = presets,
-                                selectedOption = stylePreset,
-                                accentColor = activeAccentColor,
-                                onOptionSelected = { preset -> scope.launch { settingsRepository.setStylePreset(preset) } }
-                            )
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Text(text = "COLOR ACCENT PRESET", color = LuxuryColors.WarmGray, fontSize = 10.sp, letterSpacing = 1.sp)
-                            ResponsiveOptionGrid(
-                                options = colorPresets,
-                                selectedOption = colorPreset,
-                                accentColor = activeAccentColor,
-                                onOptionSelected = { color -> scope.launch { settingsRepository.setColorPreset(color) } }
-                            )
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            DragAdjustField(
-                                label = "MAIN DISPLAY SIZE",
-                                value = mainDisplayScale,
-                                minValue = 0.7f,
-                                maxValue = 1.3f,
-                                pixelsPerUnit = 180f,
-                                accentColor = activeAccentColor,
-                                valueFormatter = { String.format("%.2fx", it) },
-                                onValueChange = { scope.launch { settingsRepository.setMainDisplayScale(it) } }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 2.dp, bottom = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = "SETTINGS",
+                                    color = LuxuryColors.CreamyWhite,
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Light,
+                                    letterSpacing = 3.sp
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "SETTINGS CATEGORIES",
+                                    color = LuxuryColors.WarmGray,
+                                    fontSize = 10.sp,
+                                    letterSpacing = 2.sp
+                                )
+                            }
+                            Text(
+                                text = "CLOSE",
+                                color = LuxuryColors.WarmGray,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium,
+                                letterSpacing = 1.5.sp,
+                                modifier = Modifier
+                                    .clickable { dismissSettings() }
+                                    .padding(10.dp)
                             )
                         }
-                        "Stopwatch" -> WidgetCategorySettings(index = 0, widgetTitle = "STOPWATCH", settingsRepository = settingsRepository, scope = scope, colorPresets = colorPresets)
-                        "Countdown" -> WidgetCategorySettings(index = 1, widgetTitle = "COUNTDOWN", settingsRepository = settingsRepository, scope = scope, colorPresets = colorPresets)
-                        "Counter" -> WidgetCategorySettings(index = 2, widgetTitle = "COUNTER", settingsRepository = settingsRepository, scope = scope, colorPresets = colorPresets)
-                        "Interval" -> {
-                            val intervalName by settingsRepository.intervalName.collectAsState(initial = "HIT")
-                            val workMs by settingsRepository.intervalWorkMs.collectAsState(initial = 40000L)
-                            val restMs by settingsRepository.intervalRestMs.collectAsState(initial = 20000L)
-                            val rounds by settingsRepository.intervalRounds.collectAsState(initial = 8)
 
-                            var nameInput by remember(intervalName) { mutableStateOf(intervalName) }
-                            var workSecs by remember(workMs) { mutableIntStateOf((workMs / 1000).toInt()) }
-                            var restSecs by remember(restMs) { mutableIntStateOf((restMs / 1000).toInt()) }
-                            var roundsVal by remember(rounds) { mutableIntStateOf(rounds) }
-
-                            Text(text = "INTERVAL CONFIGURATION", color = LuxuryColors.WarmGray, fontSize = 10.sp, letterSpacing = 1.sp)
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            OutlinedTextField(
-                                value = nameInput,
-                                onValueChange = { nameInput = it },
-                                label = { Text("Interval Name", color = LuxuryColors.WarmGray, fontSize = 10.sp) },
-                                textStyle = TextStyle(color = LuxuryColors.CreamyWhite, fontSize = 12.sp),
-                                modifier = Modifier.fillMaxWidth()
-                            )
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            DragAdjustField(
-                                label = "WORK DURATION",
-                                value = workSecs.toFloat(),
-                                minValue = 1f,
-                                maxValue = 18000f,
-                                pixelsPerUnit = 4f,
-                                accentColor = activeAccentColor,
-                                valueFormatter = { formatSettingsDuration(it.toInt()) },
-                                onValueChange = { workSecs = it.toInt().coerceIn(1, 18000) }
-                            )
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            DragAdjustField(
-                                label = "REST DURATION",
-                                value = restSecs.toFloat(),
-                                minValue = 1f,
-                                maxValue = 3600f,
-                                pixelsPerUnit = 4f,
-                                accentColor = activeAccentColor,
-                                valueFormatter = { formatSettingsDuration(it.toInt()) },
-                                onValueChange = { restSecs = it.toInt().coerceIn(1, 3600) }
-                            )
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("ROUNDS: $roundsVal", color = LuxuryColors.CreamyWhite, fontSize = 11.sp)
-                                Row {
-                                    Box(modifier = Modifier.clickable { if (roundsVal > 1) roundsVal -= 1 }.padding(8.dp)) {
-                                        Text("-", color = activeAccentColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                    Box(modifier = Modifier.clickable { roundsVal += 1 }.padding(8.dp)) {
-                                        Text("+", color = activeAccentColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        LazyVerticalGrid(
+                            columns = GridCells.Adaptive(minSize = 148.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(
+                                    min = 220.dp,
+                                    max = (panelMaxHeight - 100.dp).coerceAtLeast(220.dp)
+                                ),
+                            horizontalArrangement = Arrangement.spacedBy(7.dp),
+                            verticalArrangement = Arrangement.spacedBy(7.dp),
+                            contentPadding = PaddingValues(bottom = 4.dp)
+                        ) {
+                            items(categories, key = { it }) { categoryName ->
+                                val isPriority = categoryName == "Appearance" || categoryName == "Stopwatch"
+                                Card(
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (isPriority) Color(0xFF151412) else Color(0xFF111111)
+                                    ),
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = BorderStroke(
+                                        1.dp,
+                                        if (isPriority) activeAccentColor.copy(alpha = 0.2f)
+                                        else Color.White.copy(alpha = 0.08f)
+                                    ),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(72.dp)
+                                        .clickable { activeDialogCategory = categoryName }
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(horizontal = 10.dp, vertical = 9.dp),
+                                        verticalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(6.dp)
+                                                .background(
+                                                    activeAccentColor.copy(alpha = 0.8f),
+                                                    RoundedCornerShape(3.dp)
+                                                )
+                                        )
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.Bottom
+                                        ) {
+                                            Text(
+                                                text = categoryName.uppercase(),
+                                                color = LuxuryColors.CreamyWhite,
+                                                fontSize = 11.sp,
+                                                lineHeight = 14.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                letterSpacing = 0.8.sp,
+                                                maxLines = 2,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            Text(
+                                                text = "▸",
+                                                color = activeAccentColor.copy(alpha = 0.8f),
+                                                fontSize = 13.sp
+                                            )
+                                        }
                                     }
                                 }
-                            }
-
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            Button(
-                                onClick = {
-                                    scope.launch {
-                                        settingsRepository.setIntervalConfig(
-                                            name = nameInput.ifBlank { "HIT" },
-                                            workMs = workSecs * 1000L,
-                                            restMs = restSecs * 1000L,
-                                            rounds = roundsVal
-                                        )
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = activeAccentColor),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("SAVE CONFIGURATION", color = LuxuryColors.WarmBlack, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            }
-
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            WidgetCategorySettings(index = 3, widgetTitle = "INTERVAL", settingsRepository = settingsRepository, scope = scope, colorPresets = colorPresets)
-                        }
-                        "Floating Widgets" -> {
-                            val shapePreset by settingsRepository.shapePreset.collectAsState(initial = "rounded")
-                            val floatingPadding by settingsRepository.floatingPadding.collectAsState(initial = 6.0f)
-                            val floatingOpacity by settingsRepository.floatingOpacity.collectAsState(initial = 0.85f)
-
-                            Text(text = "SHAPE PRESET", color = LuxuryColors.WarmGray, fontSize = 10.sp)
-                            ResponsiveOptionGrid(
-                                options = shapes,
-                                selectedOption = shapePreset,
-                                accentColor = activeAccentColor,
-                                onOptionSelected = { shape -> scope.launch { settingsRepository.setShapePreset(shape) } },
-                                displayName = { it.uppercase() }
-                            )
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            DragAdjustField(
-                                label = "PADDING",
-                                value = floatingPadding,
-                                minValue = 0f,
-                                maxValue = 32f,
-                                pixelsPerUnit = 8f,
-                                accentColor = activeAccentColor,
-                                valueFormatter = { "${it.toInt()}dp" },
-                                onValueChange = { scope.launch { settingsRepository.setFloatingPadding(it) } }
-                            )
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            DragAdjustField(
-                                label = "OPACITY",
-                                value = floatingOpacity,
-                                minValue = 0f,
-                                maxValue = 1f,
-                                pixelsPerUnit = 180f,
-                                accentColor = activeAccentColor,
-                                valueFormatter = { "${(it * 100).toInt()}%" },
-                                onValueChange = { scope.launch { settingsRepository.setFloatingOpacity(it) } }
-                            )
-                        }
-                        "Sounds & Haptics" -> {
-                            Text(text = "HAPTIC FEEDBACK INTENSITY", color = LuxuryColors.WarmGray, fontSize = 10.sp)
-                            ResponsiveOptionGrid(
-                                options = intensities,
-                                selectedOption = hapticIntensity,
-                                accentColor = activeAccentColor,
-                                onOptionSelected = { intensity -> scope.launch { settingsRepository.setHapticIntensity(intensity) } }
-                            )
-                        }
-                        "Advanced" -> {
-                            val volumeCounterScreenOffEnabled by settingsRepository.volumeCounterScreenOffEnabled.collectAsState(initial = false)
-                            val layoutOrientation by settingsRepository.layoutOrientation.collectAsState(initial = "horizontal")
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(text = "VOLUME KEYS COUNTER (SCREEN OFF)", color = LuxuryColors.CreamyWhite, fontSize = 11.sp)
-                                Switch(checked = volumeCounterScreenOffEnabled, onCheckedChange = { scope.launch { settingsRepository.setVolumeCounterScreenOffEnabled(it) } }, colors = SwitchDefaults.colors(checkedThumbColor = activeAccentColor))
-                            }
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(text = "VERTICAL DISPLAY ORIENTATION", color = LuxuryColors.CreamyWhite, fontSize = 11.sp)
-                                Switch(checked = layoutOrientation == "vertical", onCheckedChange = { scope.launch { settingsRepository.setLayoutOrientation(if (it) "vertical" else "horizontal") } }, colors = SwitchDefaults.colors(checkedThumbColor = activeAccentColor))
                             }
                         }
                     }
@@ -603,8 +725,7 @@ fun WidgetCategorySettings(
     index: Int,
     widgetTitle: String,
     settingsRepository: SettingsRepository,
-    scope: kotlinx.coroutines.CoroutineScope,
-    colorPresets: List<String>
+    scope: kotlinx.coroutines.CoroutineScope
 ) {
     val isWidgetActive by settingsRepository.isWidgetActive(index).collectAsState(initial = index == 0)
     val wWidth by settingsRepository.getWidgetWidth(index).collectAsState(initial = 170.0f)
@@ -613,12 +734,23 @@ fun WidgetCategorySettings(
     val fontSizeScale by settingsRepository.getWidgetFontSizeScale(index).collectAsState(initial = 1.0f)
 
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(text = "ENABLE $widgetTitle OVERLAY", color = LuxuryColors.CreamyWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-        Switch(checked = isWidgetActive, onCheckedChange = { scope.launch { settingsRepository.setWidgetActive(index, it) } }, colors = SwitchDefaults.colors(checkedThumbColor = LuxuryColors.AccentGold))
+        Text(
+            text = "ENABLE $widgetTitle OVERLAY",
+            color = LuxuryColors.CreamyWhite,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold
+        )
+        Switch(
+            checked = isWidgetActive,
+            onCheckedChange = { scope.launch { settingsRepository.setWidgetActive(index, it) } },
+            colors = SwitchDefaults.colors(checkedThumbColor = LuxuryColors.AccentGold)
+        )
     }
 
     if (isWidgetActive) {
@@ -635,6 +767,8 @@ fun WidgetCategorySettings(
             onValueChange = { scope.launch { settingsRepository.setWidgetWidth(index, it) } }
         )
 
+        Spacer(modifier = Modifier.height(8.dp))
+
         DragAdjustField(
             label = "HEIGHT",
             value = wHeight,
@@ -647,15 +781,23 @@ fun WidgetCategorySettings(
         )
 
         Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 6.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(text = "SAVE FLOATING DIMENSIONS", color = LuxuryColors.CreamyWhite, fontSize = 10.sp)
-            Switch(checked = saveDimensions, onCheckedChange = { scope.launch { settingsRepository.setWidgetSaveDimensions(index, it) } }, colors = SwitchDefaults.colors(checkedThumbColor = LuxuryColors.AccentGold))
+            Text(
+                text = "SAVE FLOATING DIMENSIONS",
+                color = LuxuryColors.CreamyWhite,
+                fontSize = 10.sp
+            )
+            Switch(
+                checked = saveDimensions,
+                onCheckedChange = { scope.launch { settingsRepository.setWidgetSaveDimensions(index, it) } },
+                colors = SwitchDefaults.colors(checkedThumbColor = LuxuryColors.AccentGold)
+            )
         }
-
-        Spacer(modifier = Modifier.height(6.dp))
 
         Spacer(modifier = Modifier.height(6.dp))
 
@@ -669,72 +811,5 @@ fun WidgetCategorySettings(
             valueFormatter = { String.format("%.2f", it) },
             onValueChange = { scope.launch { settingsRepository.setWidgetFontSizeScale(index, it) } }
         )
-
-    }
-}
-
-@Composable
-fun CountdownDurationPicker(
-    totalSeconds: Int,
-    onDurationChanged: (Int) -> Unit
-) {
-    val hours = totalSeconds / 3600
-    val minutes = (totalSeconds % 3600) / 60
-    val seconds = totalSeconds % 60
-
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        TimeUnitBox("HOURS", hours, max = 23) { newHours ->
-            val validHours = newHours.coerceIn(0, 23)
-            val newTotal = validHours * 3600 + minutes * 60 + seconds
-            if (newTotal > 0) onDurationChanged(newTotal)
-        }
-        Text(":", color = LuxuryColors.WarmGray, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-        TimeUnitBox("MINS", minutes, max = 59) { newMins ->
-            val validMins = newMins.coerceIn(0, 59)
-            val newTotal = hours * 3600 + validMins * 60 + seconds
-            if (newTotal > 0) onDurationChanged(newTotal)
-        }
-        Text(":", color = LuxuryColors.WarmGray, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-        TimeUnitBox("SECS", seconds, max = 59) { newSecs ->
-            val validSecs = newSecs.coerceIn(0, 59)
-            val newTotal = hours * 3600 + minutes * 60 + validSecs
-            if (newTotal > 0) onDurationChanged(newTotal)
-        }
-    }
-}
-
-@Composable
-fun TimeUnitBox(
-    label: String,
-    value: Int,
-    max: Int,
-    onValueChange: (Int) -> Unit
-) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text = label, color = LuxuryColors.WarmGray, fontSize = 9.sp, letterSpacing = 1.sp)
-        Spacer(modifier = Modifier.height(2.dp))
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.border(1.dp, LuxuryColors.WarmGray.copy(alpha = 0.3f), RoundedCornerShape(8.dp)).padding(horizontal = 6.dp, vertical = 2.dp)
-        ) {
-            Box(modifier = Modifier.clickable { onValueChange(if (value > 0) value - 1 else max) }.padding(horizontal = 6.dp, vertical = 2.dp)) {
-                Text("-", color = LuxuryColors.AccentGold, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-            }
-            Text(
-                text = String.format("%02d", value),
-                color = LuxuryColors.CreamyWhite,
-                fontSize = 14.sp,
-                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 6.dp)
-            )
-            Box(modifier = Modifier.clickable { onValueChange(if (value < max) value + 1 else 0) }.padding(horizontal = 6.dp, vertical = 2.dp)) {
-                Text("+", color = LuxuryColors.AccentGold, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-            }
-        }
     }
 }
