@@ -160,7 +160,8 @@ class StopwatchService : Service() {
         val countdownDuration: MutableStateFlow<Int> = MutableStateFlow(300), // default 5 mins
         val tapCount: MutableStateFlow<Int> = MutableStateFlow(0),
         val isVolumeCounterActive: MutableStateFlow<Boolean> = MutableStateFlow(false),
-        val milestones: MutableStateFlow<List<String>> = MutableStateFlow(emptyList())
+        val milestones: MutableStateFlow<List<String>> = MutableStateFlow(emptyList()),
+        val isEditMode: MutableStateFlow<Boolean> = MutableStateFlow(false)
     )
 
     override fun onCreate() {
@@ -375,6 +376,7 @@ class StopwatchService : Service() {
                 val tapCount by state.tapCount.collectAsState()
                 val isVolumeActive by state.isVolumeCounterActive.collectAsState()
                 val milestones by state.milestones.collectAsState()
+                val isEditMode by state.isEditMode.collectAsState()
 
                 val floatingWidth by settingsRepository.getWidgetWidth(index).collectAsState(initial = 170.0f)
                 val floatingHeight by settingsRepository.getWidgetHeight(index).collectAsState(initial = 56.0f)
@@ -451,6 +453,9 @@ class StopwatchService : Service() {
                         isVolumeActive = isVolumeActive,
                         milestones = milestones,
                         showCentiseconds = true,
+                        isEditMode = isEditMode,
+                        floatingWidthDp = floatingWidth,
+                        floatingHeightDp = floatingHeight,
                         stylePreset = stylePreset,
                         accentColor = accentColor,
                         shapePreset = shapePreset,
@@ -479,7 +484,15 @@ class StopwatchService : Service() {
                             if (activeMenuOverlays.containsKey(index)) {
                                 dismissMenuOverlay(index)
                             } else {
-                                spawnMenuOverlay(index, type, fontSizeScale, isVolumeActive)
+                                spawnMenuOverlay(index, type, fontSizeScale, isVolumeActive, isEditMode)
+                            }
+                        },
+                        onResizeDrag = { dw, dh ->
+                            val newW = (floatingWidth + dw).coerceIn(90f, 320f)
+                            val newH = (floatingHeight + dh).coerceIn(36f, 160f)
+                            serviceScope.launch {
+                                settingsRepository.setWidgetWidth(index, newW)
+                                settingsRepository.setWidgetHeight(index, newH)
                             }
                         },
                         onAction = { action ->
@@ -606,6 +619,10 @@ class StopwatchService : Service() {
                 hapticController.trigger(hapticIntensity, "Lap")
                 state.isVolumeCounterActive.value = !state.isVolumeCounterActive.value
             }
+            "ToggleEdit" -> {
+                hapticController.trigger(hapticIntensity, "Lap")
+                state.isEditMode.value = !state.isEditMode.value
+            }
             "Milestone" -> {
                 hapticController.trigger(hapticIntensity, "Lap")
                 if (type == "stopwatch") {
@@ -633,7 +650,7 @@ class StopwatchService : Service() {
         }
     }
 
-    private fun spawnMenuOverlay(index: Int, widgetType: String, fontSizeScale: Float, isVolumeActive: Boolean) {
+    private fun spawnMenuOverlay(index: Int, widgetType: String, fontSizeScale: Float, isVolumeActive: Boolean, isEditMode: Boolean) {
         dismissMenuOverlay(index)
         val overlay = activeOverlays[index] ?: return
 
@@ -734,6 +751,7 @@ class StopwatchService : Service() {
                                 widgetType = widgetType,
                                 fontSizeScale = fontSizeScale,
                                 isVolumeActive = isVolumeActive,
+                                isEditMode = isEditMode,
                                 onAction = { action ->
                                     handleWidgetAction(index, action, hapticIntensity)
                                     requestDismiss()
@@ -938,6 +956,9 @@ class StopwatchService : Service() {
         isVolumeActive: Boolean,
         milestones: List<String>,
         showCentiseconds: Boolean,
+        isEditMode: Boolean,
+        floatingWidthDp: Float,
+        floatingHeightDp: Float,
         stylePreset: String,
         accentColor: Color,
         shapePreset: String,
@@ -949,6 +970,7 @@ class StopwatchService : Service() {
         onMovementDrag: (Float, Float) -> Unit,
         onMovementRelease: () -> Unit,
         onToggleMenu: () -> Unit,
+        onResizeDrag: (Float, Float) -> Unit = { _, _ -> },
         onAction: (String) -> Unit
     ) {
         val finalCornerRadius = when (shapePreset) {
@@ -1008,6 +1030,16 @@ class StopwatchService : Service() {
                     modifier = Modifier
                         .fillMaxSize()
                         .then(
+                            if (isEditMode) {
+                                Modifier.shadow(
+                                    elevation = 12.dp,
+                                    shape = RoundedCornerShape(finalCornerRadius),
+                                    ambientColor = accentColor.copy(alpha = 0.45f),
+                                    spotColor = accentColor.copy(alpha = 0.65f)
+                                )
+                            } else Modifier
+                        )
+                        .then(
                             if (stylePreset == "Glass Premium" || shapePreset == "glass") {
                                 Modifier
                                     .background(Color.White.copy(alpha = 0.12f * opacity), RoundedCornerShape(finalCornerRadius))
@@ -1022,6 +1054,15 @@ class StopwatchService : Service() {
                             } else {
                                 Modifier.background(Color.Black.copy(alpha = opacity), RoundedCornerShape(finalCornerRadius))
                             }
+                        )
+                        .then(
+                            if (isEditMode) {
+                                Modifier.border(
+                                    width = 1.dp,
+                                    color = accentColor.copy(alpha = 0.75f),
+                                    shape = RoundedCornerShape(finalCornerRadius)
+                                )
+                            } else Modifier
                         )
                 )
 
@@ -1112,6 +1153,113 @@ class StopwatchService : Service() {
                         }
                     }
                 }
+
+                // Luxury Minimal Premium Edit Mode Overlays
+                if (isEditMode) {
+                    // 1. Dimension badge at top center
+                    val currentWidthInt = floatingWidthDp.roundToInt()
+                    val currentHeightInt = floatingHeightDp.roundToInt()
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .offset(y = (-18).dp)
+                            .background(
+                                color = Color(0xF7000000),
+                                shape = RoundedCornerShape(6.dp)
+                            )
+                            .border(
+                                width = 0.5.dp,
+                                color = accentColor.copy(alpha = 0.6f),
+                                shape = RoundedCornerShape(6.dp)
+                            )
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "${currentWidthInt} × ${currentHeightInt}",
+                            style = TextStyle(
+                                color = accentColor,
+                                fontSize = 8.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp
+                            )
+                        )
+                    }
+
+                    // 2. Corner handles (Top-Left, Top-Right, Bottom-Left)
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .offset(x = (-3).dp, y = (-3).dp)
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(accentColor)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .offset(x = 3.dp, y = (-3).dp)
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(accentColor)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .offset(x = (-3).dp, y = 3.dp)
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(accentColor)
+                    )
+
+                    // 3. Interactive Bottom-Right Resize Handle
+                    val density = androidx.compose.ui.platform.LocalDensity.current
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .offset(x = 4.dp, y = 4.dp)
+                            .size(14.dp)
+                            .clip(CircleShape)
+                            .background(accentColor)
+                            .pointerInput(Unit) {
+                                detectDragGestures { change, dragAmount ->
+                                    change.consume()
+                                    val dw = with(density) { dragAmount.x.toDp().value }
+                                    val dh = with(density) { dragAmount.y.toDp().value }
+                                    onResizeDrag(dw, dh)
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(LuxuryColors.WarmBlack)
+                        )
+                    }
+
+                    // 4. Center Crosshair Alignment Guides
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .size(12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(0.5.dp)
+                                .background(accentColor.copy(alpha = 0.5f))
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .width(0.5.dp)
+                                .background(accentColor.copy(alpha = 0.5f))
+                        )
+                    }
+                }
             }
         }
     }
@@ -1177,6 +1325,7 @@ fun LuxuryTextDropdownMenu(
     widgetType: String,
     fontSizeScale: Float,
     isVolumeActive: Boolean,
+    isEditMode: Boolean = false,
     onAction: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -1207,6 +1356,7 @@ fun LuxuryTextDropdownMenu(
                 options.add("PAUSE" to "Stop")
                 options.add("RESET" to "Reset")
             }
+            options.add((if (isEditMode) "DONE EDITING" else "EDIT WIDGET") to "ToggleEdit")
             options.add("SETTING" to "OpenApp")
             options.add("CLOSE" to "Close")
 
