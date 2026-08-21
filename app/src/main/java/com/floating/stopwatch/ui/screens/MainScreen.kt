@@ -8,6 +8,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -292,74 +294,135 @@ fun MainScreen(
     ) {
         val context = androidx.compose.ui.platform.LocalContext.current
 
+        var isSettingsMenuOpen by remember { mutableStateOf(false) }
+        var activeCategory by remember { mutableStateOf<String?>(null) }
+
+        if (activeCategory != null || isSettingsMenuOpen) {
+            androidx.activity.compose.BackHandler(enabled = true) {
+                if (activeCategory != null) {
+                    activeCategory = null
+                } else {
+                    isSettingsMenuOpen = false
+                }
+            }
+        }
+
+        val settingsCategoryList = remember {
+            listOf(
+                "APPEARANCE", "STOPWATCH", "COUNTDOWN", "COUNTER", "INTERVAL",
+                "SOUNDS & HAPTICS", "FLOATING WIDGETS", "ADVANCED"
+            )
+        }
+
         // Top Right: Floating Quick Access & Settings
-        Column(
+        // Fixed absolute top layout so FLOAT stays at exactly 32.dp top padding in both open and closed states
+        Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .graphicsLayer { alpha = controlsAlpha },
-            horizontalAlignment = Alignment.End
+                .graphicsLayer { alpha = controlsAlpha }
         ) {
-            Text(
-                text = "SETTINGS",
-                style = TextStyle(
-                    color = currentGrayColor,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Light,
-                    letterSpacing = 2.sp
-                ),
-                modifier = Modifier
-                    .clickable {
-                        resetAutoHideTimer()
-                        onNavigateToSettings()
-                    }
-                    .padding(8.dp)
-            )
-
-            Text(
-                text = "FLOAT ↗",
-                style = TextStyle(
-                    color = accentColor,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = 2.sp
-                ),
-                modifier = Modifier
-                    .clickable {
-                        resetAutoHideTimer()
-                        if (android.provider.Settings.canDrawOverlays(context)) {
-                            val intent = Intent(context, com.floating.stopwatch.service.StopwatchService::class.java)
-                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                                context.startForegroundService(intent)
-                            } else {
-                                context.startService(intent)
-                            }
-                            val targetIndex = when (currentMode) {
-                                AppMode.Stopwatch -> 0
-                                AppMode.Countdown -> 1
-                                AppMode.Counter -> 2
-                                AppMode.Intervals -> 3
-                                AppMode.TimeLegacy -> 0
-                            }
-                            val targetType = when (currentMode) {
-                                AppMode.Stopwatch -> "stopwatch"
-                                AppMode.Countdown -> "countdown"
-                                AppMode.Counter -> "counter"
-                                AppMode.Intervals -> "intervals"
-                                AppMode.TimeLegacy -> "stopwatch"
-                            }
-                            scope.launch {
-                                settingsRepository.setWidgetType(targetIndex, targetType)
-                                settingsRepository.setWidgetActive(targetIndex, true)
-                            }
-                        } else {
-                            val intent = Intent(
-                                android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                android.net.Uri.parse("package:${context.packageName}")
-                            )
-                            context.startActivity(intent)
+            if (!isSettingsMenuOpen) {
+                Text(
+                    text = "SETTINGS",
+                    style = TextStyle(
+                        color = currentGrayColor,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Light,
+                        letterSpacing = 2.sp
+                    ),
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 4.dp)
+                        .clickable {
+                            resetAutoHideTimer()
+                            isSettingsMenuOpen = true
                         }
+                        .padding(8.dp)
+                )
+            }
+
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 32.dp),
+                horizontalAlignment = Alignment.End
+            ) {
+                Text(
+                    text = "FLOAT ↗",
+                    style = TextStyle(
+                        color = accentColor,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        letterSpacing = 2.sp
+                    ),
+                    modifier = Modifier
+                        .clickable {
+                            resetAutoHideTimer()
+                            if (android.provider.Settings.canDrawOverlays(context)) {
+                                val intent = Intent(context, com.floating.stopwatch.service.StopwatchService::class.java)
+                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                                    context.startForegroundService(intent)
+                                } else {
+                                    context.startService(intent)
+                                }
+                                val targetIndex = when (currentMode) {
+                                    AppMode.Stopwatch -> 0
+                                    AppMode.Countdown -> 1
+                                    AppMode.Counter -> 2
+                                    AppMode.Intervals -> 3
+                                    AppMode.TimeLegacy -> 0
+                                }
+                                val targetType = when (currentMode) {
+                                    AppMode.Stopwatch -> "stopwatch"
+                                    AppMode.Countdown -> "countdown"
+                                    AppMode.Counter -> "counter"
+                                    AppMode.Intervals -> "intervals"
+                                    AppMode.TimeLegacy -> "stopwatch"
+                                }
+                                scope.launch {
+                                    settingsRepository.setWidgetType(targetIndex, targetType)
+                                    settingsRepository.setWidgetActive(targetIndex, true)
+                                }
+                            } else {
+                                val intent = Intent(
+                                    android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    android.net.Uri.parse("package:${context.packageName}")
+                                )
+                                context.startActivity(intent)
+                            }
+                        }
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+
+                if (isSettingsMenuOpen) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    settingsCategoryList.forEach { cat ->
+                        Text(
+                            text = cat,
+                            style = TextStyle(
+                                color = accentColor,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                letterSpacing = 2.sp
+                            ),
+                            modifier = Modifier
+                                .clickable {
+                                    resetAutoHideTimer()
+                                    activeCategory = cat
+                                }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
                     }
-                    .padding(8.dp)
+                }
+            }
+        }
+
+        if (activeCategory != null) {
+            SettingsCategoryPopup(
+                category = activeCategory!!,
+                settingsRepository = settingsRepository,
+                accentColor = accentColor,
+                onDismiss = { activeCategory = null }
             )
         }
 
@@ -1377,6 +1440,443 @@ fun IntervalQuickEditDialog(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun SettingsCategoryPopup(
+    category: String,
+    settingsRepository: SettingsRepository,
+    accentColor: Color,
+    onDismiss: () -> Unit
+) {
+    val scope = rememberCoroutineScope()
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.65f))
+            .clickable { onDismiss() },
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .widthIn(max = 520.dp)
+                .wrapContentHeight()
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
+            shape = RoundedCornerShape(16.dp),
+            color = LuxuryColors.WarmBlack,
+            border = BorderStroke(1.dp, accentColor.copy(alpha = 0.4f)),
+            shadowElevation = 12.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = category.uppercase(),
+                        style = TextStyle(color = LuxuryColors.CreamyWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                    )
+                    Text(
+                        text = "✕",
+                        style = TextStyle(color = LuxuryColors.WarmGray, fontSize = 16.sp),
+                        modifier = Modifier
+                            .clickable { onDismiss() }
+                            .padding(6.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                CategoryContent(
+                    categoryName = category,
+                    settingsRepository = settingsRepository,
+                    accentColor = accentColor,
+                    scope = scope
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun CategoryContent(
+    categoryName: String,
+    settingsRepository: SettingsRepository,
+    accentColor: Color,
+    scope: kotlinx.coroutines.CoroutineScope
+) {
+    val stylePreset by settingsRepository.stylePreset.collectAsState(initial = "Glass Premium")
+    val colorPreset by settingsRepository.colorPreset.collectAsState(initial = "Gold")
+    val hapticIntensity by settingsRepository.hapticIntensity.collectAsState(initial = "Medium")
+    val themeMode by settingsRepository.themeMode.collectAsState(initial = "Midnight")
+    val mainDisplayScale by settingsRepository.mainDisplayScale.collectAsState(initial = 1.0f)
+
+    val shapes = listOf("rounded", "capsule", "circle", "sharp", "glass")
+    val themeModes = listOf("Midnight Dark", "Warm Paper Light", "Obsidian Dark", "Pure White Light")
+    val presets = listOf("Glass Premium", "Obsidian", "Titanium", "Ultra Minimal")
+    val intensities = listOf("Off", "Light", "Medium", "Strong")
+    val colorPresets = listOf("Gold", "Galaxy Blue", "Titanium", "Emerald", "Sapphire", "Violet", "Rose", "Ice", "Amber", "Pure White")
+
+    when (categoryName.uppercase()) {
+        "APPEARANCE" -> {
+            Text("ILLUMINATION MODE", color = LuxuryColors.WarmGray, fontSize = 10.sp, letterSpacing = 1.8.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+                themeModes.forEach { mode ->
+                    val isSel = themeMode == mode
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(if (isSel) accentColor.copy(alpha = 0.2f) else Color(0xFF161616))
+                            .clickable { scope.launch { settingsRepository.setThemeMode(mode) } }
+                            .padding(8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(mode.take(8), color = if (isSel) LuxuryColors.CreamyWhite else LuxuryColors.WarmGray, fontSize = 9.sp)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Text("STYLE PRESET", color = LuxuryColors.WarmGray, fontSize = 10.sp, letterSpacing = 1.8.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+                presets.forEach { preset ->
+                    val isSel = stylePreset == preset
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(if (isSel) accentColor.copy(alpha = 0.2f) else Color(0xFF161616))
+                            .clickable { scope.launch { settingsRepository.setStylePreset(preset) } }
+                            .padding(8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(preset.take(8), color = if (isSel) LuxuryColors.CreamyWhite else LuxuryColors.WarmGray, fontSize = 9.sp)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Text("COLOR ACCENT PRESET", color = LuxuryColors.WarmGray, fontSize = 10.sp, letterSpacing = 1.8.sp)
+            LazyColumn(modifier = Modifier.height(110.dp)) {
+                items(colorPresets.chunked(3)) { rowColors ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+                        rowColors.forEach { col ->
+                            val isSel = colorPreset == col
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (isSel) accentColor.copy(alpha = 0.25f) else Color(0xFF161616))
+                                    .clickable { scope.launch { settingsRepository.setColorPreset(col) } }
+                                    .padding(6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(col, color = if (isSel) LuxuryColors.CreamyWhite else LuxuryColors.WarmGray, fontSize = 9.sp)
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            DragAdjustField(
+                label = "MAIN DISPLAY SCALE",
+                value = mainDisplayScale,
+                minValue = 0.7f,
+                maxValue = 1.3f,
+                pixelsPerUnit = 180f,
+                accentColor = accentColor,
+                valueFormatter = { String.format("%.2fx", it) },
+                onValueChange = { scope.launch { settingsRepository.setMainDisplayScale(it) } }
+            )
+        }
+        "STOPWATCH" -> WidgetSettingsBlock(index = 0, widgetTitle = "STOPWATCH", settingsRepository = settingsRepository, scope = scope, accentColor = accentColor)
+        "COUNTDOWN" -> WidgetSettingsBlock(index = 1, widgetTitle = "COUNTDOWN", settingsRepository = settingsRepository, scope = scope, accentColor = accentColor)
+        "COUNTER" -> WidgetSettingsBlock(index = 2, widgetTitle = "COUNTER", settingsRepository = settingsRepository, scope = scope, accentColor = accentColor)
+        "INTERVAL" -> {
+            val intervalName by settingsRepository.intervalName.collectAsState(initial = "HIT")
+            val workMs by settingsRepository.intervalWorkMs.collectAsState(initial = 40000L)
+            val restMs by settingsRepository.intervalRestMs.collectAsState(initial = 20000L)
+            val rounds by settingsRepository.intervalRounds.collectAsState(initial = 8)
+
+            var nameInput by remember(intervalName) { mutableStateOf(intervalName) }
+            var workSecs by remember(workMs) { mutableIntStateOf((workMs / 1000).toInt()) }
+            var restSecs by remember(restMs) { mutableIntStateOf((restMs / 1000).toInt()) }
+            var roundsVal by remember(rounds) { mutableIntStateOf(rounds) }
+
+            Text("INTERVAL CONFIGURATION", color = LuxuryColors.WarmGray, fontSize = 10.sp, letterSpacing = 1.8.sp)
+            Spacer(modifier = Modifier.height(6.dp))
+
+            OutlinedTextField(
+                value = nameInput,
+                onValueChange = { nameInput = it },
+                label = { Text("Interval Name", color = LuxuryColors.WarmGray, fontSize = 10.sp) },
+                textStyle = TextStyle(color = LuxuryColors.CreamyWhite, fontSize = 12.sp),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            DragAdjustField(
+                label = "WORK DURATION",
+                value = workSecs.toFloat(),
+                minValue = 1f,
+                maxValue = 18000f,
+                pixelsPerUnit = 4f,
+                accentColor = accentColor,
+                valueFormatter = { formatDurationHoursMinutes(it.toInt()) },
+                onValueChange = { workSecs = it.toInt().coerceIn(1, 18000) }
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            DragAdjustField(
+                label = "REST DURATION",
+                value = restSecs.toFloat(),
+                minValue = 1f,
+                maxValue = 3600f,
+                pixelsPerUnit = 4f,
+                accentColor = accentColor,
+                valueFormatter = { formatDurationHoursMinutes(it.toInt()) },
+                onValueChange = { restSecs = it.toInt().coerceIn(1, 3600) }
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("ROUNDS: $roundsVal", color = LuxuryColors.CreamyWhite, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                Row {
+                    Box(modifier = Modifier.clickable { if (roundsVal > 1) roundsVal -= 1 }.padding(8.dp)) {
+                        Text("-", color = accentColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Box(modifier = Modifier.clickable { roundsVal += 1 }.padding(8.dp)) {
+                        Text("+", color = accentColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Button(
+                onClick = {
+                    scope.launch {
+                        settingsRepository.setIntervalConfig(
+                            name = nameInput.ifBlank { "HIT" },
+                            workMs = workSecs * 1000L,
+                            restMs = restSecs * 1000L,
+                            rounds = roundsVal
+                        )
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = accentColor),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("SAVE CONFIGURATION", color = LuxuryColors.WarmBlack, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            WidgetSettingsBlock(index = 3, widgetTitle = "INTERVAL", settingsRepository = settingsRepository, scope = scope, accentColor = accentColor)
+        }
+        "SOUNDS & HAPTICS" -> {
+            Text("HAPTIC INTENSITY", color = LuxuryColors.WarmGray, fontSize = 10.sp, letterSpacing = 1.8.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+                intensities.forEach { intensity ->
+                    val isSel = hapticIntensity == intensity
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(if (isSel) accentColor.copy(alpha = 0.2f) else Color(0xFF161616))
+                            .clickable { scope.launch { settingsRepository.setHapticIntensity(intensity) } }
+                            .padding(8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(intensity, color = if (isSel) LuxuryColors.CreamyWhite else LuxuryColors.WarmGray, fontSize = 10.sp)
+                    }
+                }
+            }
+        }
+        "FLOATING WIDGETS" -> {
+            val shapePreset by settingsRepository.shapePreset.collectAsState(initial = "rounded")
+            val floatingPadding by settingsRepository.floatingPadding.collectAsState(initial = 6.0f)
+            val floatingOpacity by settingsRepository.floatingOpacity.collectAsState(initial = 0.85f)
+
+            Text("SHAPE PRESET", color = LuxuryColors.WarmGray, fontSize = 10.sp, letterSpacing = 1.8.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+                shapes.forEach { shape ->
+                    val isSel = shapePreset == shape
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(if (isSel) accentColor.copy(alpha = 0.2f) else Color(0xFF161616))
+                            .clickable { scope.launch { settingsRepository.setShapePreset(shape) } }
+                            .padding(8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(shape.uppercase(), color = if (isSel) LuxuryColors.CreamyWhite else LuxuryColors.WarmGray, fontSize = 9.sp)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            DragAdjustField(
+                label = "PADDING",
+                value = floatingPadding,
+                minValue = 0f,
+                maxValue = 32f,
+                pixelsPerUnit = 8f,
+                accentColor = accentColor,
+                valueFormatter = { "${it.toInt()}dp" },
+                onValueChange = { scope.launch { settingsRepository.setFloatingPadding(it) } }
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            DragAdjustField(
+                label = "OPACITY",
+                value = floatingOpacity,
+                minValue = 0f,
+                maxValue = 1f,
+                pixelsPerUnit = 180f,
+                accentColor = accentColor,
+                valueFormatter = { "${(it * 100).toInt()}%" },
+                onValueChange = { scope.launch { settingsRepository.setFloatingOpacity(it) } }
+            )
+        }
+        "ADVANCED" -> {
+            val volumeCounterScreenOffEnabled by settingsRepository.volumeCounterScreenOffEnabled.collectAsState(initial = false)
+            val layoutOrientation by settingsRepository.layoutOrientation.collectAsState(initial = "horizontal")
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("VOLUME KEYS COUNTER", color = LuxuryColors.CreamyWhite, fontSize = 11.sp)
+                Switch(
+                    checked = volumeCounterScreenOffEnabled,
+                    onCheckedChange = { scope.launch { settingsRepository.setVolumeCounterScreenOffEnabled(it) } },
+                    colors = SwitchDefaults.colors(checkedThumbColor = accentColor)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("VERTICAL DISPLAY ORIENTATION", color = LuxuryColors.CreamyWhite, fontSize = 11.sp)
+                Switch(
+                    checked = layoutOrientation == "vertical",
+                    onCheckedChange = { scope.launch { settingsRepository.setLayoutOrientation(if (it) "vertical" else "horizontal") } },
+                    colors = SwitchDefaults.colors(checkedThumbColor = accentColor)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun WidgetSettingsBlock(
+    index: Int,
+    widgetTitle: String,
+    settingsRepository: SettingsRepository,
+    scope: kotlinx.coroutines.CoroutineScope,
+    accentColor: Color
+) {
+    val isWidgetActive by settingsRepository.isWidgetActive(index).collectAsState(initial = index == 0)
+    val wWidth by settingsRepository.getWidgetWidth(index).collectAsState(initial = 170.0f)
+    val wHeight by settingsRepository.getWidgetHeight(index).collectAsState(initial = 56.0f)
+    val saveDimensions by settingsRepository.getWidgetSaveDimensions(index).collectAsState(initial = true)
+    val fontSizeScale by settingsRepository.getWidgetFontSizeScale(index).collectAsState(initial = 1.0f)
+
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("ENABLE $widgetTitle OVERLAY", color = LuxuryColors.CreamyWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Switch(
+            checked = isWidgetActive,
+            onCheckedChange = { scope.launch { settingsRepository.setWidgetActive(index, it) } },
+            colors = SwitchDefaults.colors(checkedThumbColor = accentColor)
+        )
+    }
+
+    if (isWidgetActive) {
+        Spacer(modifier = Modifier.height(8.dp))
+
+        DragAdjustField(
+            label = "WIDTH",
+            value = wWidth,
+            minValue = 1f,
+            maxValue = 320f,
+            pixelsPerUnit = 1.5f,
+            accentColor = accentColor,
+            valueFormatter = { "${it.toInt()}dp" },
+            onValueChange = { scope.launch { settingsRepository.setWidgetWidth(index, it) } }
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        DragAdjustField(
+            label = "HEIGHT",
+            value = wHeight,
+            minValue = 1f,
+            maxValue = 120f,
+            pixelsPerUnit = 2.5f,
+            accentColor = accentColor,
+            valueFormatter = { "${it.toInt()}dp" },
+            onValueChange = { scope.launch { settingsRepository.setWidgetHeight(index, it) } }
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("SAVE FLOATING DIMENSIONS", color = LuxuryColors.CreamyWhite, fontSize = 10.sp)
+            Switch(
+                checked = saveDimensions,
+                onCheckedChange = { scope.launch { settingsRepository.setWidgetSaveDimensions(index, it) } },
+                colors = SwitchDefaults.colors(checkedThumbColor = accentColor)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        DragAdjustField(
+            label = "FONT SIZE SCALE",
+            value = fontSizeScale,
+            minValue = 0.5f,
+            maxValue = 1.5f,
+            pixelsPerUnit = 180f,
+            accentColor = accentColor,
+            valueFormatter = { String.format("%.2f", it) },
+            onValueChange = { scope.launch { settingsRepository.setWidgetFontSizeScale(index, it) } }
+        )
     }
 }
 
