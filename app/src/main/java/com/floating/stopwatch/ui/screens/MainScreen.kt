@@ -283,134 +283,24 @@ fun MainScreen(
                 )
             }
     ) {
-        val context = androidx.compose.ui.platform.LocalContext.current
-
-        // Top Right: Floating Quick Access & Settings (positioned slightly lower)
-        Column(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 16.dp)
-                .graphicsLayer { alpha = controlsAlpha },
-            horizontalAlignment = Alignment.End
-        ) {
-            Text(
-                text = "SETTINGS",
-                style = TextStyle(
-                    color = currentGrayColor,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Light,
-                    letterSpacing = 2.sp
-                ),
-                modifier = Modifier
-                    .clickable {
-                        resetAutoHideTimer()
-                        onNavigateToSettings()
-                    }
-                    .padding(8.dp)
-            )
-
-            Text(
-                text = "FLOAT ↗",
-                style = TextStyle(
-                    color = accentColor,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = 2.sp
-                ),
-                modifier = Modifier
-                    .clickable {
-                        resetAutoHideTimer()
-                        if (android.provider.Settings.canDrawOverlays(context)) {
-                            val intent = Intent(context, com.floating.stopwatch.service.StopwatchService::class.java)
-                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                                context.startForegroundService(intent)
-                            } else {
-                                context.startService(intent)
-                            }
-                            val targetIndex = when (currentMode) {
-                                AppMode.Stopwatch -> 0
-                                AppMode.Countdown -> 1
-                                AppMode.Counter -> 2
-                                AppMode.Intervals -> 3
-                            }
-                            val targetType = when (currentMode) {
-                                AppMode.Stopwatch -> "stopwatch"
-                                AppMode.Countdown -> "countdown"
-                                AppMode.Counter -> "counter"
-                                AppMode.Intervals -> "intervals"
-                            }
-                            scope.launch {
-                                settingsRepository.setWidgetType(targetIndex, targetType)
-                                settingsRepository.setWidgetActive(targetIndex, true)
-                            }
-                        } else {
-                            val intent = Intent(
-                                android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                android.net.Uri.parse("package:${context.packageName}")
-                            )
-                            context.startActivity(intent)
-                        }
-                    }
-                    .padding(8.dp)
-            )
-        }
-
-        // Top label & Luxury Minimal navigation quick bar
-        Column(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .graphicsLayer { alpha = controlsAlpha }
-        ) {
-            Text(
-                text = when (currentMode) {
-                    AppMode.Stopwatch -> "STOPWATCH ▾"
-                    AppMode.Countdown -> "COUNTDOWN ▾"
-                    AppMode.Counter -> "COUNTER ▾"
-                    AppMode.Intervals -> "INTERVALS ▾"
-                },
-                style = TextStyle(
-                    color = currentTextColor,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.ExtraLight,
-                    letterSpacing = 4.sp
-                ),
-                modifier = Modifier
-                    .clickable {
-                        resetAutoHideTimer()
-                        hapticController.trigger(hapticIntensity, "Lap")
-                        viewModel.cycleMode()
-                    }
-                    .padding(4.dp)
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = "GOALS",
-                    style = TextStyle(color = currentGrayColor, fontSize = 10.sp, fontWeight = FontWeight.Light, letterSpacing = 1.5.sp),
-                    modifier = Modifier.clickable { onNavigateToGoals() }.padding(2.dp)
-                )
-                Text("•", style = TextStyle(color = currentGrayColor.copy(alpha = 0.5f), fontSize = 10.sp))
-                Text(
-                    text = "MEMORIES",
-                    style = TextStyle(color = currentGrayColor, fontSize = 10.sp, fontWeight = FontWeight.Light, letterSpacing = 1.5.sp),
-                    modifier = Modifier.clickable { onNavigateToMemories() }.padding(2.dp)
-                )
-                Text("•", style = TextStyle(color = currentGrayColor.copy(alpha = 0.5f), fontSize = 10.sp))
-                Text(
-                    text = "SCENES",
-                    style = TextStyle(color = currentGrayColor, fontSize = 10.sp, fontWeight = FontWeight.Light, letterSpacing = 1.5.sp),
-                    modifier = Modifier.clickable { onNavigateToScenes() }.padding(2.dp)
-                )
-                Text("•", style = TextStyle(color = currentGrayColor.copy(alpha = 0.5f), fontSize = 10.sp))
-                Text(
-                    text = "STATS",
-                    style = TextStyle(color = accentColor, fontSize = 10.sp, fontWeight = FontWeight.Medium, letterSpacing = 1.5.sp),
-                    modifier = Modifier.clickable { onNavigateToGamification() }.padding(2.dp)
-                )
-            }
-        }
+        TopHeaderSection(
+            currentMode = currentMode,
+            controlsAlpha = controlsAlpha,
+            currentTextColor = currentTextColor,
+            currentGrayColor = currentGrayColor,
+            accentColor = accentColor,
+            hapticIntensity = hapticIntensity,
+            hapticController = hapticController,
+            viewModel = viewModel,
+            settingsRepository = settingsRepository,
+            scope = scope,
+            resetAutoHideTimer = { resetAutoHideTimer() },
+            onNavigateToSettings = onNavigateToSettings,
+            onNavigateToGoals = onNavigateToGoals,
+            onNavigateToMemories = onNavigateToMemories,
+            onNavigateToScenes = onNavigateToScenes,
+            onNavigateToGamification = onNavigateToGamification
+        )
 
         // Breathing pulse animation when stopwatch is at 0 for more than 5 seconds
         val isAtZeroForFiveSecs = elapsedTimeMs == 0L && state == StopwatchState.Ready
@@ -1081,6 +971,155 @@ fun MainScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun BoxScope.TopHeaderSection(
+    currentMode: AppMode,
+    controlsAlpha: Float,
+    currentTextColor: Color,
+    currentGrayColor: Color,
+    accentColor: Color,
+    hapticIntensity: String,
+    hapticController: HapticController,
+    viewModel: MainViewModel,
+    settingsRepository: SettingsRepository,
+    scope: kotlinx.coroutines.CoroutineScope,
+    resetAutoHideTimer: () -> Unit,
+    onNavigateToSettings: () -> Unit,
+    onNavigateToGoals: () -> Unit,
+    onNavigateToMemories: () -> Unit,
+    onNavigateToScenes: () -> Unit,
+    onNavigateToGamification: () -> Unit
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    // Top Right: Floating Quick Access & Settings (positioned slightly lower)
+    Column(
+        modifier = Modifier
+            .align(Alignment.TopEnd)
+            .padding(top = 16.dp)
+            .graphicsLayer { alpha = controlsAlpha },
+        horizontalAlignment = Alignment.End
+    ) {
+        Text(
+            text = "SETTINGS",
+            style = TextStyle(
+                color = currentGrayColor,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Light,
+                letterSpacing = 2.sp
+            ),
+            modifier = Modifier
+                .clickable {
+                    resetAutoHideTimer()
+                    onNavigateToSettings()
+                }
+                .padding(8.dp)
+        )
+
+        Text(
+            text = "FLOAT ↗",
+            style = TextStyle(
+                color = accentColor,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 2.sp
+            ),
+            modifier = Modifier
+                .clickable {
+                    resetAutoHideTimer()
+                    if (android.provider.Settings.canDrawOverlays(context)) {
+                        val intent = Intent(context, com.floating.stopwatch.service.StopwatchService::class.java)
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                            context.startForegroundService(intent)
+                        } else {
+                            context.startService(intent)
+                        }
+                        val targetIndex = when (currentMode) {
+                            AppMode.Stopwatch -> 0
+                            AppMode.Countdown -> 1
+                            AppMode.Counter -> 2
+                            AppMode.Intervals -> 3
+                        }
+                        val targetType = when (currentMode) {
+                            AppMode.Stopwatch -> "stopwatch"
+                            AppMode.Countdown -> "countdown"
+                            AppMode.Counter -> "counter"
+                            AppMode.Intervals -> "intervals"
+                        }
+                        scope.launch {
+                            settingsRepository.setWidgetType(targetIndex, targetType)
+                            settingsRepository.setWidgetActive(targetIndex, true)
+                        }
+                    } else {
+                        val intent = Intent(
+                            android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            android.net.Uri.parse("package:${context.packageName}")
+                        )
+                        context.startActivity(intent)
+                    }
+                }
+                .padding(8.dp)
+        )
+    }
+
+    // Top label & Luxury Minimal navigation quick bar
+    Column(
+        modifier = Modifier
+            .align(Alignment.TopStart)
+            .graphicsLayer { alpha = controlsAlpha }
+    ) {
+        Text(
+            text = when (currentMode) {
+                AppMode.Stopwatch -> "STOPWATCH ▾"
+                AppMode.Countdown -> "COUNTDOWN ▾"
+                AppMode.Counter -> "COUNTER ▾"
+                AppMode.Intervals -> "INTERVALS ▾"
+            },
+            style = TextStyle(
+                color = currentTextColor,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.ExtraLight,
+                letterSpacing = 4.sp
+            ),
+            modifier = Modifier
+                .clickable {
+                    resetAutoHideTimer()
+                    hapticController.trigger(hapticIntensity, "Lap")
+                    viewModel.cycleMode()
+                }
+                .padding(4.dp)
+        )
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = "GOALS",
+                style = TextStyle(color = currentGrayColor, fontSize = 10.sp, fontWeight = FontWeight.Light, letterSpacing = 1.5.sp),
+                modifier = Modifier.clickable { onNavigateToGoals() }.padding(2.dp)
+            )
+            Text("•", style = TextStyle(color = currentGrayColor.copy(alpha = 0.5f), fontSize = 10.sp))
+            Text(
+                text = "MEMORIES",
+                style = TextStyle(color = currentGrayColor, fontSize = 10.sp, fontWeight = FontWeight.Light, letterSpacing = 1.5.sp),
+                modifier = Modifier.clickable { onNavigateToMemories() }.padding(2.dp)
+            )
+            Text("•", style = TextStyle(color = currentGrayColor.copy(alpha = 0.5f), fontSize = 10.sp))
+            Text(
+                text = "SCENES",
+                style = TextStyle(color = currentGrayColor, fontSize = 10.sp, fontWeight = FontWeight.Light, letterSpacing = 1.5.sp),
+                modifier = Modifier.clickable { onNavigateToScenes() }.padding(2.dp)
+            )
+            Text("•", style = TextStyle(color = currentGrayColor.copy(alpha = 0.5f), fontSize = 10.sp))
+            Text(
+                text = "STATS",
+                style = TextStyle(color = accentColor, fontSize = 10.sp, fontWeight = FontWeight.Medium, letterSpacing = 1.5.sp),
+                modifier = Modifier.clickable { onNavigateToGamification() }.padding(2.dp)
+            )
         }
     }
 }
