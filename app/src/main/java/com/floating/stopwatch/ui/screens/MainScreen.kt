@@ -426,7 +426,7 @@ fun MainScreen(
             )
         }
 
-        // Top label - Tapping cycles mode (Stopwatch -> Countdown -> Counter -> Intervals -> Stopwatch)
+        // Top label - Tapping cycles mode (Stopwatch -> Countdown -> Counter -> Intervals -> Time Legacy)
         Column(
             modifier = Modifier
                 .align(Alignment.TopStart)
@@ -454,24 +454,6 @@ fun MainScreen(
                         viewModel.cycleMode()
                     }
                     .padding(4.dp)
-            )
-
-            Spacer(modifier = Modifier.height(2.dp))
-
-            Text(
-                text = "LEGACY ↗",
-                style = TextStyle(
-                    color = accentColor,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = 2.sp
-                ),
-                modifier = Modifier
-                    .clickable {
-                        resetAutoHideTimer()
-                        viewModel.currentMode.value = AppMode.TimeLegacy
-                    }
-                    .padding(2.dp)
             )
         }
 
