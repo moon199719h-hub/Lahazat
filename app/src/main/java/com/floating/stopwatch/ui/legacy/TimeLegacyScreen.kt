@@ -115,32 +115,36 @@ fun TimeLegacyScreen(
             )
         }
         is LegacySubScreen.DetailView -> {
+            val activeLegacy = legacies.find { it.id == screen.legacy.id } ?: screen.legacy
             LegacyDetailView(
-                legacy = screen.legacy,
+                legacy = activeLegacy,
                 settingsRepository = settingsRepository,
                 onReload = { loadLegacies() },
                 onBack = { currentSubScreen = LegacySubScreen.ListDashboard },
-                onEdit = { currentSubScreen = LegacySubScreen.CreateEdit(screen.legacy) },
-                onOpenPlan = { currentSubScreen = LegacySubScreen.Plan(screen.legacy) },
-                onOpenJourney = { currentSubScreen = LegacySubScreen.Journey(screen.legacy) },
-                onOpenMoments = { currentSubScreen = LegacySubScreen.Moments(screen.legacy) },
-                onOpenInsights = { currentSubScreen = LegacySubScreen.Insights(screen.legacy) },
-                onOpenFinale = { currentSubScreen = LegacySubScreen.Finale(screen.legacy) }
+                onEdit = { currentSubScreen = LegacySubScreen.CreateEdit(activeLegacy) },
+                onOpenPlan = { currentSubScreen = LegacySubScreen.Plan(activeLegacy) },
+                onOpenJourney = { currentSubScreen = LegacySubScreen.Journey(activeLegacy) },
+                onOpenMoments = { currentSubScreen = LegacySubScreen.Moments(activeLegacy) },
+                onOpenInsights = { currentSubScreen = LegacySubScreen.Insights(activeLegacy) },
+                onOpenFinale = { currentSubScreen = LegacySubScreen.Finale(activeLegacy) }
             )
         }
         is LegacySubScreen.Plan -> {
-            LegacyPlanScreen(legacy = screen.legacy, onBack = { currentSubScreen = LegacySubScreen.DetailView(screen.legacy) })
+            val activeLegacy = legacies.find { it.id == screen.legacy.id } ?: screen.legacy
+            LegacyPlanScreen(legacy = activeLegacy, onBack = { currentSubScreen = LegacySubScreen.DetailView(activeLegacy) })
         }
         is LegacySubScreen.Journey -> {
-            LegacyJourneyScreen(legacy = screen.legacy, onBack = { currentSubScreen = LegacySubScreen.DetailView(screen.legacy) })
+            val activeLegacy = legacies.find { it.id == screen.legacy.id } ?: screen.legacy
+            LegacyJourneyScreen(legacy = activeLegacy, onBack = { currentSubScreen = LegacySubScreen.DetailView(activeLegacy) })
         }
         is LegacySubScreen.Moments -> {
+            val activeLegacy = legacies.find { it.id == screen.legacy.id } ?: screen.legacy
             LegacyMomentsScreen(
-                legacy = screen.legacy,
-                onBack = { currentSubScreen = LegacySubScreen.DetailView(screen.legacy) },
+                legacy = activeLegacy,
+                onBack = { currentSubScreen = LegacySubScreen.DetailView(activeLegacy) },
                 onAddJournalEntry = { text ->
-                    val newEntry = LegacyJournalEntry(id = UUID.randomUUID().toString(), legacyId = screen.legacy.id, text = text)
-                    val updated = screen.legacy.copy(journalEntries = screen.legacy.journalEntries + newEntry)
+                    val newEntry = LegacyJournalEntry(id = UUID.randomUUID().toString(), legacyId = activeLegacy.id, text = text)
+                    val updated = activeLegacy.copy(journalEntries = activeLegacy.journalEntries + newEntry)
                     val newList = legacies.map { if (it.id == updated.id) updated else it }
                     saveLegacies(newList)
                     currentSubScreen = LegacySubScreen.Moments(updated)
@@ -148,10 +152,12 @@ fun TimeLegacyScreen(
             )
         }
         is LegacySubScreen.Insights -> {
-            LegacyInsightsScreen(legacy = screen.legacy, onBack = { currentSubScreen = LegacySubScreen.DetailView(screen.legacy) })
+            val activeLegacy = legacies.find { it.id == screen.legacy.id } ?: screen.legacy
+            LegacyInsightsScreen(legacy = activeLegacy, onBack = { currentSubScreen = LegacySubScreen.DetailView(activeLegacy) })
         }
         is LegacySubScreen.Finale -> {
-            LegacyFinaleScreen(legacy = screen.legacy, onBack = { currentSubScreen = LegacySubScreen.DetailView(screen.legacy) })
+            val activeLegacy = legacies.find { it.id == screen.legacy.id } ?: screen.legacy
+            LegacyFinaleScreen(legacy = activeLegacy, onBack = { currentSubScreen = LegacySubScreen.DetailView(activeLegacy) })
         }
     }
 }
