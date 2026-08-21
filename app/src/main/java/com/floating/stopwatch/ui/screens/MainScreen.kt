@@ -1450,10 +1450,27 @@ fun SettingsCategoryPopup(
 ) {
     val scope = rememberCoroutineScope()
 
+    var isVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        isVisible = true
+    }
+
+    val popupAlpha by animateFloatAsState(
+        targetValue = if (isVisible) 1.0f else 0.0f,
+        animationSpec = tween(durationMillis = 150),
+        label = "PopupAlpha"
+    )
+
+    val popupScale by animateFloatAsState(
+        targetValue = if (isVisible) 1.0f else 0.96f,
+        animationSpec = tween(durationMillis = 150),
+        label = "PopupScale"
+    )
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.75f))
+            .background(Color.Black.copy(alpha = 0.75f * popupAlpha))
             .clickable { onDismiss() },
         contentAlignment = Alignment.Center
     ) {
@@ -1462,6 +1479,11 @@ fun SettingsCategoryPopup(
                 .fillMaxWidth(0.9f)
                 .widthIn(max = 520.dp)
                 .wrapContentHeight()
+                .graphicsLayer {
+                    alpha = popupAlpha
+                    scaleX = popupScale
+                    scaleY = popupScale
+                }
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
             shape = RoundedCornerShape(16.dp),
             color = Color(0xFF0D0D0D),
@@ -1816,10 +1838,10 @@ fun CategoryContent(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("VOLUME KEYS COUNTER", color = LuxuryColors.CreamyWhite, fontSize = 11.sp)
-                Switch(
+                com.floating.stopwatch.ui.components.LuxuryToggle(
                     checked = volumeCounterScreenOffEnabled,
                     onCheckedChange = { scope.launch { settingsRepository.setVolumeCounterScreenOffEnabled(it) } },
-                    colors = SwitchDefaults.colors(checkedThumbColor = accentColor)
+                    accentColor = accentColor
                 )
             }
 
@@ -1831,10 +1853,10 @@ fun CategoryContent(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("VERTICAL DISPLAY ORIENTATION", color = LuxuryColors.CreamyWhite, fontSize = 11.sp)
-                Switch(
+                com.floating.stopwatch.ui.components.LuxuryToggle(
                     checked = layoutOrientation == "vertical",
                     onCheckedChange = { scope.launch { settingsRepository.setLayoutOrientation(if (it) "vertical" else "horizontal") } },
-                    colors = SwitchDefaults.colors(checkedThumbColor = accentColor)
+                    accentColor = accentColor
                 )
             }
         }
@@ -1885,10 +1907,10 @@ fun WidgetSettingsBlock(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("SAVE FLOATING DIMENSIONS", color = LuxuryColors.CreamyWhite, fontSize = 10.sp)
-            Switch(
+            com.floating.stopwatch.ui.components.LuxuryToggle(
                 checked = saveDimensions,
                 onCheckedChange = { scope.launch { settingsRepository.setWidgetSaveDimensions(index, it) } },
-                colors = SwitchDefaults.colors(checkedThumbColor = accentColor)
+                accentColor = accentColor
             )
         }
 

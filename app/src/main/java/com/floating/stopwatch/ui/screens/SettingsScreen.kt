@@ -461,10 +461,10 @@ fun SettingsScreen(
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Medium
                                     )
-                                    Switch(
+                                    com.floating.stopwatch.ui.components.LuxuryToggle(
                                         checked = volumeCounterScreenOffEnabled,
                                         onCheckedChange = { scope.launch { settingsRepository.setVolumeCounterScreenOffEnabled(it) } },
-                                        colors = SwitchDefaults.colors(checkedThumbColor = activeAccentColor)
+                                        accentColor = LuxuryColors.AccentGold
                                     )
                                 }
 
@@ -481,10 +481,10 @@ fun SettingsScreen(
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Medium
                                     )
-                                    Switch(
+                                    com.floating.stopwatch.ui.components.LuxuryToggle(
                                         checked = layoutOrientation == "vertical",
                                         onCheckedChange = { scope.launch { settingsRepository.setLayoutOrientation(if (it) "vertical" else "horizontal") } },
-                                        colors = SwitchDefaults.colors(checkedThumbColor = activeAccentColor)
+                                        accentColor = LuxuryColors.AccentGold
                                     )
                                 }
                             }
@@ -746,10 +746,10 @@ fun WidgetCategorySettings(
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold
         )
-        Switch(
+        com.floating.stopwatch.ui.components.LuxuryToggle(
             checked = isWidgetActive,
             onCheckedChange = { scope.launch { settingsRepository.setWidgetActive(index, it) } },
-            colors = SwitchDefaults.colors(checkedThumbColor = LuxuryColors.AccentGold)
+            accentColor = LuxuryColors.AccentGold
         )
     }
 
@@ -792,10 +792,10 @@ fun WidgetCategorySettings(
                 color = LuxuryColors.CreamyWhite,
                 fontSize = 10.sp
             )
-            Switch(
+            com.floating.stopwatch.ui.components.LuxuryToggle(
                 checked = saveDimensions,
                 onCheckedChange = { scope.launch { settingsRepository.setWidgetSaveDimensions(index, it) } },
-                colors = SwitchDefaults.colors(checkedThumbColor = LuxuryColors.AccentGold)
+                accentColor = LuxuryColors.AccentGold
             )
         }
 
