@@ -301,6 +301,7 @@ fun MainScreen(
             androidx.activity.compose.BackHandler(enabled = true) {
                 if (activeCategory != null) {
                     activeCategory = null
+                    isSettingsMenuOpen = true
                 } else {
                     isSettingsMenuOpen = false
                 }
@@ -321,7 +322,7 @@ fun MainScreen(
                 .align(Alignment.TopEnd)
                 .graphicsLayer { alpha = controlsAlpha }
         ) {
-            if (!isSettingsMenuOpen) {
+            if (!isSettingsMenuOpen && activeCategory == null) {
                 Text(
                     text = "SETTINGS",
                     style = TextStyle(
@@ -394,7 +395,7 @@ fun MainScreen(
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 )
 
-                if (isSettingsMenuOpen) {
+                if (isSettingsMenuOpen && activeCategory == null) {
                     Spacer(modifier = Modifier.height(2.dp))
                     settingsCategoryList.forEach { cat ->
                         Text(
@@ -408,6 +409,7 @@ fun MainScreen(
                             modifier = Modifier
                                 .clickable {
                                     resetAutoHideTimer()
+                                    isSettingsMenuOpen = false
                                     activeCategory = cat
                                 }
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
@@ -422,7 +424,10 @@ fun MainScreen(
                 category = activeCategory!!,
                 settingsRepository = settingsRepository,
                 accentColor = accentColor,
-                onDismiss = { activeCategory = null }
+                onDismiss = {
+                    activeCategory = null
+                    isSettingsMenuOpen = true
+                }
             )
         }
 
