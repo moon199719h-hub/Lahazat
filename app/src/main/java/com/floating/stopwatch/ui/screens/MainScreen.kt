@@ -1455,7 +1455,7 @@ fun SettingsCategoryPopup(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.65f))
+            .background(Color.Black.copy(alpha = 0.75f))
             .clickable { onDismiss() },
         contentAlignment = Alignment.Center
     ) {
@@ -1466,14 +1466,15 @@ fun SettingsCategoryPopup(
                 .wrapContentHeight()
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
             shape = RoundedCornerShape(16.dp),
-            color = LuxuryColors.WarmBlack,
-            border = BorderStroke(1.dp, accentColor.copy(alpha = 0.4f)),
-            shadowElevation = 12.dp
+            color = Color(0xFF0D0D0D),
+            border = BorderStroke(1.dp, accentColor.copy(alpha = 0.35f)),
+            shadowElevation = 16.dp
         ) {
             Column(
                 modifier = Modifier
                     .padding(20.dp)
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1501,6 +1502,28 @@ fun SettingsCategoryPopup(
                     accentColor = accentColor,
                     scope = scope
                 )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFF1C1C1E))
+                        .clickable { onDismiss() }
+                        .padding(vertical = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "CLOSE",
+                        style = TextStyle(
+                            color = LuxuryColors.CreamyWhite,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 2.sp
+                        )
+                    )
+                }
             }
         }
     }
@@ -1806,28 +1829,12 @@ fun WidgetSettingsBlock(
     scope: kotlinx.coroutines.CoroutineScope,
     accentColor: Color
 ) {
-    val isWidgetActive by settingsRepository.isWidgetActive(index).collectAsState(initial = index == 0)
     val wWidth by settingsRepository.getWidgetWidth(index).collectAsState(initial = 170.0f)
     val wHeight by settingsRepository.getWidgetHeight(index).collectAsState(initial = 56.0f)
     val saveDimensions by settingsRepository.getWidgetSaveDimensions(index).collectAsState(initial = true)
     val fontSizeScale by settingsRepository.getWidgetFontSizeScale(index).collectAsState(initial = 1.0f)
 
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text("ENABLE $widgetTitle OVERLAY", color = LuxuryColors.CreamyWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-        Switch(
-            checked = isWidgetActive,
-            onCheckedChange = { scope.launch { settingsRepository.setWidgetActive(index, it) } },
-            colors = SwitchDefaults.colors(checkedThumbColor = accentColor)
-        )
-    }
-
-    if (isWidgetActive) {
-        Spacer(modifier = Modifier.height(8.dp))
-
+    Column {
         DragAdjustField(
             label = "WIDTH",
             value = wWidth,
