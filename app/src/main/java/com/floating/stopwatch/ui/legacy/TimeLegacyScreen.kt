@@ -182,27 +182,6 @@ fun TimeLegacyDashboardView(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "TIME LEGACY",
-                    style = TextStyle(color = LuxuryColors.CreamyWhite, fontSize = 18.sp, fontWeight = FontWeight.ExtraLight, letterSpacing = 4.sp)
-                )
-
-                Text(
-                    text = "[CLOSE]",
-                    style = TextStyle(color = LuxuryColors.WarmGray, fontSize = 11.sp, letterSpacing = 2.sp),
-                    modifier = Modifier
-                        .clickable { onBack() }
-                        .padding(8.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
                     text = "ACTIVE LEGACIES (${legacies.size})",
                     style = TextStyle(color = LuxuryColors.WarmGray, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
                 )

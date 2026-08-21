@@ -83,8 +83,7 @@ fun MainScreen(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var showBottomSheet by remember { mutableStateOf(false) }
 
-    val intervalEngine = viewModel.intervalEngine
-    val intervalState by intervalEngine.state.collectAsState()
+    val intervalState by viewModel.intervalState.collectAsState()
 
     val isCurrentlyRunning = when (currentMode) {
         AppMode.Stopwatch -> state == StopwatchState.Running
@@ -157,7 +156,8 @@ fun MainScreen(
     LaunchedEffect(intervalState) {
         if (intervalState == IntervalState.COMPLETED && lastSignalledIntervalState != IntervalState.COMPLETED) {
             CompletionSoundPlayer.playCompletionClick()
-            val totalConfigured = intervalEngine.activeTemplate.value?.let {
+            val activeT = viewModel.intervalActiveTemplate.value
+            val totalConfigured = activeT?.let {
                 (it.workDurationMs + it.restDurationMs) * it.repetitions
             } ?: 0L
             if (totalConfigured >= 1000L) {
@@ -728,102 +728,18 @@ fun MainScreen(
                     )
                 }
                 AppMode.Intervals -> {
-                    val activeTemplate by intervalEngine.activeTemplate.collectAsState()
-                    val currentRound by intervalEngine.currentRound.collectAsState()
-                    val stageRemainingMs by intervalEngine.stageRemainingMs.collectAsState()
-                    val currentStage = intervalEngine.getCurrentStage()
-                    val nextStage = intervalEngine.getNextStage()
-
-                    var showBuilderDialog by remember { mutableStateOf(false) }
-
-                    if (activeTemplate != null) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center
-                            ) {
-                                Text(
-                                    text = activeTemplate.name.uppercase(),
-                                    style = TextStyle(color = accentColor, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "[EDIT]",
-                                    style = TextStyle(color = currentGrayColor, fontSize = 10.sp, fontWeight = FontWeight.Light, letterSpacing = 1.sp),
-                                    modifier = Modifier
-                                        .graphicsLayer { alpha = secondaryAlpha }
-                                        .clickable {
-                                            resetAutoHideTimer()
-                                            showBuilderDialog = true
-                                        }
-                                        .padding(4.dp)
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            Text(
-                                text = currentStage?.name?.uppercase() ?: "READY",
-                                style = TextStyle(
-                                    color = if (currentStage?.type == IntervalStageType.WORK) accentColor else currentTextColor,
-                                    fontSize = 20.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 3.sp
-                                )
-                            )
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            TimeDisplay(
-                                elapsedTimeMs = stageRemainingMs,
-                                showCentiseconds = true,
-                                baseStyle = TextStyle(color = currentTextColor, fontSize = 48.sp),
-                                scaleFactor = mainSize,
-                                accentColor = accentColor,
-                                modifier = Modifier.scale(scalePulse)
-                            )
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Text(
-                                text = "ROUND $currentRound / ${activeTemplate!!.repetitions}",
-                                style = TextStyle(color = currentGrayColor, fontSize = 12.sp, fontWeight = FontWeight.Light, letterSpacing = 2.sp),
-                                modifier = Modifier.graphicsLayer { alpha = secondaryAlpha }
-                            )
-
-                            if (nextStage != null) {
-                                Spacer(modifier = Modifier.height(8.dp))
-                                val nextSecs = nextStage.durationMs / 1000
-                                Text(
-                                    text = "NEXT: ${nextStage.name} (${nextSecs}s)",
-                                    style = TextStyle(color = currentGrayColor.copy(alpha = 0.7f), fontSize = 10.sp, fontWeight = FontWeight.Normal, letterSpacing = 1.sp),
-                                    modifier = Modifier.graphicsLayer { alpha = secondaryAlpha }
-                                )
-                            }
-                        }
-                    }
-
-                    if (showBuilderDialog && activeTemplate != null) {
-                        IntervalQuickEditDialog(
-                            initialTemplate = activeTemplate,
-                            onDismiss = { showBuilderDialog = false },
-                            onSave = { updatedTemplate ->
-                                intervalEngine.loadTemplate(updatedTemplate)
-                                scope.launch {
-                                    settingsRepository.setIntervalConfig(
-                                        name = updatedTemplate.name,
-                                        workMs = updatedTemplate.workDurationMs,
-                                        restMs = updatedTemplate.restDurationMs,
-                                        rounds = updatedTemplate.repetitions
-                                    )
-                                }
-                                showBuilderDialog = false
-                            }
-                        )
-                    }
+                    IntervalModeContent(
+                        viewModel = viewModel,
+                        settingsRepository = settingsRepository,
+                        accentColor = accentColor,
+                        currentTextColor = currentTextColor,
+                        currentGrayColor = currentGrayColor,
+                        mainSize = mainSize,
+                        scalePulse = scalePulse,
+                        secondaryAlpha = secondaryAlpha,
+                        resetAutoHideTimer = { resetAutoHideTimer() },
+                        scope = scope
+                    )
                 }
                 AppMode.TimeLegacy -> {
                     com.floating.stopwatch.ui.legacy.TimeLegacyScreen(
@@ -855,7 +771,7 @@ fun MainScreen(
                             .clickable {
                                 resetAutoHideTimer()
                                 hapticController.trigger(hapticIntensity, "Reset")
-                                intervalEngine.reset()
+                                viewModel.resetInterval()
                             },
                         contentAlignment = Alignment.Center
                     ) {
@@ -885,10 +801,10 @@ fun MainScreen(
                                 resetAutoHideTimer()
                                 if (isRunning) {
                                     hapticController.trigger(hapticIntensity, "Stop")
-                                    intervalEngine.pause()
+                                    viewModel.pauseInterval()
                                 } else {
                                     hapticController.trigger(hapticIntensity, "Start")
-                                    intervalEngine.start(scope)
+                                    viewModel.startInterval(scope)
                                 }
                             },
                         contentAlignment = Alignment.Center
@@ -1292,6 +1208,118 @@ fun MainScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun IntervalModeContent(
+    viewModel: MainViewModel,
+    settingsRepository: SettingsRepository,
+    accentColor: Color,
+    currentTextColor: Color,
+    currentGrayColor: Color,
+    mainSize: Float,
+    scalePulse: Float,
+    secondaryAlpha: Float,
+    resetAutoHideTimer: () -> Unit,
+    scope: kotlinx.coroutines.CoroutineScope
+) {
+    val activeTemplateState by viewModel.intervalActiveTemplate.collectAsState()
+    val currentRound by viewModel.intervalCurrentRound.collectAsState()
+    val stageRemainingMs by viewModel.intervalStageRemainingMs.collectAsState()
+    val currentStage = viewModel.intervalEngine.getCurrentStage()
+    val nextStage = viewModel.intervalEngine.getNextStage()
+
+    var showBuilderDialog by remember { mutableStateOf(false) }
+
+    val template = activeTemplateState
+    if (template != null) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = template.name.uppercase(),
+                    style = TextStyle(color = accentColor, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "[EDIT]",
+                    style = TextStyle(color = currentGrayColor, fontSize = 10.sp, fontWeight = FontWeight.Light, letterSpacing = 1.sp),
+                    modifier = Modifier
+                        .graphicsLayer { alpha = secondaryAlpha }
+                        .clickable {
+                            resetAutoHideTimer()
+                            showBuilderDialog = true
+                        }
+                        .padding(4.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = currentStage?.name?.uppercase() ?: "READY",
+                style = TextStyle(
+                    color = if (currentStage?.type == IntervalStageType.WORK) accentColor else currentTextColor,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 3.sp
+                )
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            TimeDisplay(
+                elapsedTimeMs = stageRemainingMs,
+                showCentiseconds = true,
+                baseStyle = TextStyle(color = currentTextColor, fontSize = 48.sp),
+                scaleFactor = mainSize,
+                accentColor = accentColor,
+                modifier = Modifier.scale(scalePulse)
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "ROUND $currentRound / ${template.repetitions}",
+                style = TextStyle(color = currentGrayColor, fontSize = 12.sp, fontWeight = FontWeight.Light, letterSpacing = 2.sp),
+                modifier = Modifier.graphicsLayer { alpha = secondaryAlpha }
+            )
+
+            if (nextStage != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                val nextSecs = nextStage.durationMs / 1000
+                Text(
+                    text = "NEXT: ${nextStage.name} (${nextSecs}s)",
+                    style = TextStyle(color = currentGrayColor.copy(alpha = 0.7f), fontSize = 10.sp, fontWeight = FontWeight.Normal, letterSpacing = 1.sp),
+                    modifier = Modifier.graphicsLayer { alpha = secondaryAlpha }
+                )
+            }
+        }
+
+        if (showBuilderDialog) {
+            IntervalQuickEditDialog(
+                initialTemplate = template,
+                onDismiss = { showBuilderDialog = false },
+                onSave = { updatedTemplate ->
+                    viewModel.loadIntervalTemplate(updatedTemplate)
+                    scope.launch {
+                        settingsRepository.setIntervalConfig(
+                            name = updatedTemplate.name,
+                            workMs = updatedTemplate.workDurationMs,
+                            restMs = updatedTemplate.restDurationMs,
+                            rounds = updatedTemplate.repetitions
+                        )
+                    }
+                    showBuilderDialog = false
+                }
+            )
         }
     }
 }

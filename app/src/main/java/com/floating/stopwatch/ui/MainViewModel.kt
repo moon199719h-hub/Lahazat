@@ -37,6 +37,28 @@ class MainViewModel(
     // Counter State delegated to shared engine
     val counterValue: StateFlow<Long> = engine.counterValue
 
+    // Interval State delegated to IntervalEngine
+    val intervalState = intervalEngine.state
+    val intervalActiveTemplate = intervalEngine.activeTemplate
+    val intervalCurrentRound = intervalEngine.currentRound
+    val intervalStageRemainingMs = intervalEngine.stageRemainingMs
+
+    fun startInterval(scope: kotlinx.coroutines.CoroutineScope) {
+        intervalEngine.start(scope)
+    }
+
+    fun pauseInterval() {
+        intervalEngine.pause()
+    }
+
+    fun resetInterval() {
+        intervalEngine.reset()
+    }
+
+    fun loadIntervalTemplate(template: com.floating.stopwatch.domain.IntervalTemplate) {
+        intervalEngine.loadTemplate(template)
+    }
+
     fun cycleMode() {
         val nextMode = when (currentMode.value) {
             AppMode.Stopwatch -> AppMode.Countdown
