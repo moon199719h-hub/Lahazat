@@ -37,6 +37,14 @@ class MainViewModel(
     // Counter State delegated to shared engine
     val counterValue: StateFlow<Long> = engine.counterValue
 
+    fun setMode(mode: AppMode) {
+        currentMode.value = mode
+    }
+
+    fun setCountdownDurationMs(durationMs: Long) {
+        countdownEngine.setDuration(durationMs)
+    }
+
     fun cycleMode() {
         val nextMode = when (currentMode.value) {
             AppMode.Stopwatch -> AppMode.Countdown

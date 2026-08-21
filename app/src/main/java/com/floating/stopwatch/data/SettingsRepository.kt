@@ -1,9 +1,17 @@
 package com.floating.stopwatch.data
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
+import com.floating.stopwatch.domain.Goal
+import com.floating.stopwatch.domain.TimeMemory
+import com.floating.stopwatch.ui.screens.parseGoalsJson
+import com.floating.stopwatch.ui.screens.parseTimeMemoriesJson
+import com.floating.stopwatch.ui.screens.serializeGoalsJson
+import com.floating.stopwatch.ui.screens.serializeTimeMemoriesJson
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 val Context.dataStore by preferencesDataStore(name = "settings")
@@ -30,6 +38,31 @@ class SettingsRepository(private val context: Context) {
         val INTERVAL_REST_MS = longPreferencesKey("interval_rest_ms")
         val INTERVAL_ROUNDS = intPreferencesKey("interval_rounds")
         val CUSTOM_INTERVAL_TEMPLATES = stringPreferencesKey("custom_interval_templates")
+        val CUSTOM_SCENES_JSON = stringPreferencesKey("custom_scenes_json")
+        val ACTIVE_SCENE_ID = stringPreferencesKey("active_scene_id")
+        val GOALS_JSON = stringPreferencesKey("goals_json")
+        val TIME_MEMORIES_JSON = stringPreferencesKey("time_memories_json")
+    }
+
+    val goalsJson: Flow<String> = context.dataStore.data.map { it[GOALS_JSON] ?: "" }
+    val timeMemoriesJson: Flow<String> = context.dataStore.data.map { it[TIME_MEMORIES_JSON] ?: "" }
+    val customScenesJson: Flow<String> = context.dataStore.data.map { it[CUSTOM_SCENES_JSON] ?: "" }
+    val activeSceneId: Flow<String> = context.dataStore.data.map { it[ACTIVE_SCENE_ID] ?: "" }
+
+    suspend fun setGoalsJson(json: String) {
+        context.dataStore.edit { it[GOALS_JSON] = json }
+    }
+
+    suspend fun setTimeMemoriesJson(json: String) {
+        context.dataStore.edit { it[TIME_MEMORIES_JSON] = json }
+    }
+
+    suspend fun setCustomScenesJson(json: String) {
+        context.dataStore.edit { it[CUSTOM_SCENES_JSON] = json }
+    }
+
+    suspend fun setActiveSceneId(id: String) {
+        context.dataStore.edit { it[ACTIVE_SCENE_ID] = id }
     }
 
     val intervalName: Flow<String> = context.dataStore.data.map { it[INTERVAL_NAME] ?: "HIT" }
@@ -198,6 +231,54 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setThemeMode(mode: String) {
         context.dataStore.edit { it[THEME_MODE] = mode }
+    }
+
+    suspend fun recordCompletedSession(
+        title: String,
+        mode: String,
+        durationMs: Long,
+        sceneName: String = "",
+        linkedGoalId: String? = null
+    ) {
+        if (durationMs < 1000L) return // Don't record trivial/accidental sessions
+
+        val now = SystemClock.uptimeMillis()
+        val currentMemories = com.floating.stopwatch.ui.screens.parseTimeMemoriesJson(timeMemoriesJson.first())
+
+        // Prevent duplicate creation of the same session within 2 seconds
+        val lastMemory = currentMemories.maxByOrNull { it.createdAtMs }
+        if (lastMemory != null && lastMemory.title == title && lastMemory.durationMs == durationMs && (System.currentTimeMillis() - lastMemory.createdAtMs) < 2000L) {
+            return
+        }
+
+        val newMemory = com.floating.stopwatch.domain.TimeMemory(
+            id = java.util.UUID.randomUUID().toString(),
+            title = title,
+            mode = mode,
+            startTimeMs = System.currentTimeMillis() - durationMs,
+            endTimeMs = System.currentTimeMillis(),
+            durationMs = durationMs,
+            sceneName = sceneName,
+            linkedGoalId = linkedGoalId
+        )
+
+        val updatedMemories = currentMemories + newMemory
+        setTimeMemoriesJson(com.floating.stopwatch.ui.screens.serializeTimeMemoriesJson(updatedMemories))
+
+        // Auto-update linked or matching active Goals
+        val currentGoals = com.floating.stopwatch.ui.screens.parseGoalsJson(goalsJson.first())
+        if (currentGoals.isNotEmpty()) {
+            val updatedGoals = currentGoals.map { goal ->
+                val matches = (linkedGoalId != null && goal.id == linkedGoalId) ||
+                        (linkedGoalId == null && goal.title.equals(title, ignoreCase = true))
+                if (matches && !goal.isCompleted) {
+                    val newAcc = goal.accumulatedDurationMs + durationMs
+                    val isComp = newAcc >= goal.targetDurationMs
+                    goal.copy(accumulatedDurationMs = newAcc, isCompleted = isComp)
+                } else goal
+            }
+            setGoalsJson(com.floating.stopwatch.ui.screens.serializeGoalsJson(updatedGoals))
+        }
     }
 
     suspend fun setShapePreset(preset: String) {

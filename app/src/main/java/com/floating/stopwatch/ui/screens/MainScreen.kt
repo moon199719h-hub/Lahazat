@@ -63,7 +63,11 @@ fun MainScreen(
     mainSize: Float,
     accentColor: Color,
     themeMode: String,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToGoals: () -> Unit = {},
+    onNavigateToMemories: () -> Unit = {},
+    onNavigateToScenes: () -> Unit = {},
+    onNavigateToGamification: () -> Unit = {}
 ) {
     val currentMode by viewModel.currentMode.collectAsState()
     val state by viewModel.state.collectAsState()
@@ -131,11 +135,21 @@ fun MainScreen(
         }
     }
 
-    // Completion Sound Triggers
+    // Completion Sound & Automatic Single-Source-of-Truth Memory Recording
     var lastCompletedCountdownTime by remember { mutableStateOf<Long?>(null) }
     LaunchedEffect(countdownRemainingMs, isCountdownRunning) {
         if (countdownRemainingMs == 0L && !isCountdownRunning && lastCompletedCountdownTime != 0L && lastCompletedCountdownTime != null) {
             CompletionSoundPlayer.playCompletionClick()
+            val totalConfigured = viewModel.countdownInitialMs.value
+            if (totalConfigured >= 1000L) {
+                scope.launch {
+                    settingsRepository.recordCompletedSession(
+                        title = "Countdown Focus",
+                        mode = "countdown",
+                        durationMs = totalConfigured
+                    )
+                }
+            }
             lastCompletedCountdownTime = 0L
         } else if (countdownRemainingMs > 0L) {
             lastCompletedCountdownTime = countdownRemainingMs
@@ -340,18 +354,11 @@ fun MainScreen(
             )
         }
 
-        // Top label - Tapping cycles mode (Stopwatch -> Countdown -> Counter -> Intervals -> Stopwatch)
+        // Top label & Luxury Minimal navigation quick bar
         Column(
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(top = 16.dp)
                 .graphicsLayer { alpha = controlsAlpha }
-                .clickable {
-                    resetAutoHideTimer()
-                    hapticController.trigger(hapticIntensity, "Lap")
-                    viewModel.cycleMode()
-                }
-                .padding(4.dp)
         ) {
             Text(
                 text = when (currentMode) {
@@ -365,8 +372,43 @@ fun MainScreen(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.ExtraLight,
                     letterSpacing = 4.sp
-                )
+                ),
+                modifier = Modifier
+                    .clickable {
+                        resetAutoHideTimer()
+                        hapticController.trigger(hapticIntensity, "Lap")
+                        viewModel.cycleMode()
+                    }
+                    .padding(4.dp)
             )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "GOALS",
+                    style = TextStyle(color = currentGrayColor, fontSize = 10.sp, fontWeight = FontWeight.Light, letterSpacing = 1.5.sp),
+                    modifier = Modifier.clickable { onNavigateToGoals() }.padding(2.dp)
+                )
+                Text("•", style = TextStyle(color = currentGrayColor.copy(alpha = 0.5f), fontSize = 10.sp))
+                Text(
+                    text = "MEMORIES",
+                    style = TextStyle(color = currentGrayColor, fontSize = 10.sp, fontWeight = FontWeight.Light, letterSpacing = 1.5.sp),
+                    modifier = Modifier.clickable { onNavigateToMemories() }.padding(2.dp)
+                )
+                Text("•", style = TextStyle(color = currentGrayColor.copy(alpha = 0.5f), fontSize = 10.sp))
+                Text(
+                    text = "SCENES",
+                    style = TextStyle(color = currentGrayColor, fontSize = 10.sp, fontWeight = FontWeight.Light, letterSpacing = 1.5.sp),
+                    modifier = Modifier.clickable { onNavigateToScenes() }.padding(2.dp)
+                )
+                Text("•", style = TextStyle(color = currentGrayColor.copy(alpha = 0.5f), fontSize = 10.sp))
+                Text(
+                    text = "STATS",
+                    style = TextStyle(color = accentColor, fontSize = 10.sp, fontWeight = FontWeight.Medium, letterSpacing = 1.5.sp),
+                    modifier = Modifier.clickable { onNavigateToGamification() }.padding(2.dp)
+                )
+            }
         }
 
         // Breathing pulse animation when stopwatch is at 0 for more than 5 seconds
@@ -786,6 +828,15 @@ fun MainScreen(
                                     viewModel.lap()
                                 } else if (state == StopwatchState.Paused) {
                                     hapticController.trigger(hapticIntensity, "Reset")
+                                    if (elapsedTimeMs >= 3000L) {
+                                        scope.launch {
+                                            settingsRepository.recordCompletedSession(
+                                                title = "Stopwatch Timing",
+                                                mode = "stopwatch",
+                                                durationMs = elapsedTimeMs
+                                            )
+                                        }
+                                    }
                                     viewModel.reset()
                                 }
                             },
