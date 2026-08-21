@@ -30,6 +30,55 @@ class SettingsRepository(private val context: Context) {
         val INTERVAL_REST_MS = longPreferencesKey("interval_rest_ms")
         val INTERVAL_ROUNDS = intPreferencesKey("interval_rounds")
         val CUSTOM_INTERVAL_TEMPLATES = stringPreferencesKey("custom_interval_templates")
+        val TIME_LEGACIES_JSON = stringPreferencesKey("time_legacies_json")
+    }
+
+    val timeLegaciesJson: Flow<String> = context.dataStore.data.map { it[TIME_LEGACIES_JSON] ?: "[]" }
+
+    suspend fun saveTimeLegaciesJson(json: String) {
+        context.dataStore.edit { it[TIME_LEGACIES_JSON] = json }
+    }
+
+    suspend fun recordCompletedSession(title: String, mode: String, durationMs: Long) {
+        if (durationMs < 1000L) return
+        context.dataStore.edit { prefs ->
+            val json = prefs[TIME_LEGACIES_JSON] ?: "[]"
+            val legacies = com.floating.stopwatch.domain.TimeLegacy.parseListJson(json)
+            if (legacies.isNotEmpty()) {
+                val updatedLegacies = legacies.map { legacy ->
+                    if (legacy.status == com.floating.stopwatch.domain.LegacyStatus.ACTIVE) {
+                        val updatedGoals = if (legacy.goals.isNotEmpty()) {
+                            val firstGoal = legacy.goals.first()
+                            listOf(firstGoal.copy(actualDurationMillis = firstGoal.actualDurationMillis + durationMs)) + legacy.goals.drop(1)
+                        } else {
+                            listOf(
+                                com.floating.stopwatch.domain.LegacyGoal(
+                                    id = java.util.UUID.randomUUID().toString(),
+                                    title = "Main Target",
+                                    targetDurationMillis = legacy.targetDurationMillis,
+                                    actualDurationMillis = durationMs
+                                )
+                            )
+                        }
+                        val sessionMoment = com.floating.stopwatch.domain.LegacyMoment(
+                            id = java.util.UUID.randomUUID().toString(),
+                            legacyId = legacy.id,
+                            title = "Completed Session ($mode)",
+                            timestamp = System.currentTimeMillis(),
+                            message = "Logged ${durationMs / 1000}s in $title",
+                            durationMillis = durationMs
+                        )
+                        val updatedMoments = legacy.moments + sessionMoment
+                        val tempLegacy = legacy.copy(goals = updatedGoals, moments = updatedMoments)
+                        val newMilestones = com.floating.stopwatch.domain.LegacyMilestoneDetector.detectNewMilestones(tempLegacy)
+                        tempLegacy.copy(moments = updatedMoments + newMilestones, updatedAt = System.currentTimeMillis())
+                    } else {
+                        legacy
+                    }
+                }
+                prefs[TIME_LEGACIES_JSON] = com.floating.stopwatch.domain.TimeLegacy.serializeListJson(updatedLegacies)
+            }
+        }
     }
 
     val intervalName: Flow<String> = context.dataStore.data.map { it[INTERVAL_NAME] ?: "HIT" }

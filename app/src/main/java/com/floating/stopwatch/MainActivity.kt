@@ -181,11 +181,17 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                     mainSize = mainDisplayScale,
                     accentColor = accentColor,
                     themeMode = themeMode,
-                    onNavigateToSettings = { currentScreen = "Settings" }
+                    onNavigateToSettings = { currentScreen = "Settings" },
+                    onNavigateToLegacy = { currentScreen = "TimeLegacy" }
                 )
 
                 if (currentScreen == "Settings") {
                     SettingsScreen(
+                        settingsRepository = settingsRepository,
+                        onBack = { currentScreen = "Main" }
+                    )
+                } else if (currentScreen == "TimeLegacy") {
+                    com.floating.stopwatch.ui.legacy.TimeLegacyScreen(
                         settingsRepository = settingsRepository,
                         onBack = { currentScreen = "Main" }
                     )

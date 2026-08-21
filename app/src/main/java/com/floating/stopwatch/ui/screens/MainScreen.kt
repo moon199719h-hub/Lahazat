@@ -63,7 +63,8 @@ fun MainScreen(
     mainSize: Float,
     accentColor: Color,
     themeMode: String,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToLegacy: () -> Unit = {}
 ) {
     val currentMode by viewModel.currentMode.collectAsState()
     val state by viewModel.state.collectAsState()
@@ -131,11 +132,17 @@ fun MainScreen(
         }
     }
 
-    // Completion Sound Triggers
+    // Completion Sound & Session Persistence Triggers
     var lastCompletedCountdownTime by remember { mutableStateOf<Long?>(null) }
     LaunchedEffect(countdownRemainingMs, isCountdownRunning) {
         if (countdownRemainingMs == 0L && !isCountdownRunning && lastCompletedCountdownTime != 0L && lastCompletedCountdownTime != null) {
             CompletionSoundPlayer.playCompletionClick()
+            val configured = viewModel.countdownInitialMs.value
+            if (configured >= 1000L) {
+                scope.launch {
+                    settingsRepository.recordCompletedSession("Countdown Focus", "countdown", configured)
+                }
+            }
             lastCompletedCountdownTime = 0L
         } else if (countdownRemainingMs > 0L) {
             lastCompletedCountdownTime = countdownRemainingMs
@@ -147,6 +154,14 @@ fun MainScreen(
     LaunchedEffect(intervalState) {
         if (intervalState == IntervalState.COMPLETED && lastSignalledIntervalState != IntervalState.COMPLETED) {
             CompletionSoundPlayer.playCompletionClick()
+            val totalConfigured = intervalEngine.activeTemplate.value?.let {
+                (it.workDurationMs + it.restDurationMs) * it.repetitions
+            } ?: 0L
+            if (totalConfigured >= 1000L) {
+                scope.launch {
+                    settingsRepository.recordCompletedSession("Interval Training", "interval", totalConfigured)
+                }
+            }
             lastSignalledIntervalState = IntervalState.COMPLETED
         } else if (intervalState != IntervalState.COMPLETED) {
             lastSignalledIntervalState = intervalState
@@ -346,12 +361,6 @@ fun MainScreen(
                 .align(Alignment.TopStart)
                 .padding(top = 16.dp)
                 .graphicsLayer { alpha = controlsAlpha }
-                .clickable {
-                    resetAutoHideTimer()
-                    hapticController.trigger(hapticIntensity, "Lap")
-                    viewModel.cycleMode()
-                }
-                .padding(4.dp)
         ) {
             Text(
                 text = when (currentMode) {
@@ -365,7 +374,32 @@ fun MainScreen(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.ExtraLight,
                     letterSpacing = 4.sp
-                )
+                ),
+                modifier = Modifier
+                    .clickable {
+                        resetAutoHideTimer()
+                        hapticController.trigger(hapticIntensity, "Lap")
+                        viewModel.cycleMode()
+                    }
+                    .padding(4.dp)
+            )
+
+            Spacer(modifier = Modifier.height(2.dp))
+
+            Text(
+                text = "LEGACY ↗",
+                style = TextStyle(
+                    color = accentColor,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = 2.sp
+                ),
+                modifier = Modifier
+                    .clickable {
+                        resetAutoHideTimer()
+                        onNavigateToLegacy()
+                    }
+                    .padding(2.dp)
             )
         }
 
@@ -786,6 +820,11 @@ fun MainScreen(
                                     viewModel.lap()
                                 } else if (state == StopwatchState.Paused) {
                                     hapticController.trigger(hapticIntensity, "Reset")
+                                    if (elapsedTimeMs >= 3000L) {
+                                        scope.launch {
+                                            settingsRepository.recordCompletedSession("Stopwatch Session", "stopwatch", elapsedTimeMs)
+                                        }
+                                    }
                                     viewModel.reset()
                                 }
                             },
