@@ -65,8 +65,7 @@ fun MainScreen(
     mainSize: Float,
     accentColor: Color,
     themeMode: String,
-    onNavigateToSettings: () -> Unit,
-    onNavigateToLegacy: () -> Unit = {}
+    onNavigateToSettings: () -> Unit
 ) {
     val currentMode by viewModel.currentMode.collectAsState()
     val state by viewModel.state.collectAsState()
